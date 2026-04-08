@@ -32,6 +32,11 @@ static Result serverLoop() {
         return SOCKET_ERROR;
     }
 
+    {
+        int option = 1;
+        setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+    }
+
     if(bind(server_socket, (struct sockaddr*)&address, sizeof(address)) < 0) {
         fprintf(stderr, "Bind Error: %s\n", strerror(errno));
         close(server_socket);
@@ -60,13 +65,14 @@ static Result serverLoop() {
 
         char buf[BUFSIZ];
         int read_size = 0;
-        while((read_size = recv(client_socket, buf, BUFSIZ-1, 0)) >= 0) {
+        while((read_size = recv(client_socket, buf, BUFSIZ-1, 0)) > 0) {
             send(client_socket, buf, read_size, 0);
         }
         
         close(client_socket);
     // }
 
+    shutdown(server_socket, SHUT_RDWR);
     close(server_socket);
     return SUCCESS;
 }
