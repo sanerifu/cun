@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+#include <stdlib.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -8,6 +9,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <fcntl.h>
+#include <threads.h>
 
 typedef enum {
     SUCCESS,
@@ -16,6 +18,18 @@ typedef enum {
     LISTEN_ERROR,
     ACCEPT_ERROR,
 } Result;
+
+static int handleRequest(void* socket_ptr) {
+    int socket = *(int*)socket_ptr;
+    char buf[BUFSIZ];
+    int read_size = 0;
+    while((read_size = recv(socket, buf, BUFSIZ-1, 0)) > 0) {
+        send(socket, buf, read_size, 0);
+    }
+    close(socket);
+    free(socket_ptr);
+    return SUCCESS;
+}
 
 static Result serverLoop() {
     int server_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -43,7 +57,7 @@ static Result serverLoop() {
         return BIND_ERROR;
     }
 
-    // while(true) {
+    while(true) {
         if(listen(server_socket, 3) < 0) {
             fprintf(stderr, "Listening Error: %s\n", strerror(errno));
             close(server_socket);
@@ -56,21 +70,15 @@ static Result serverLoop() {
             return ACCEPT_ERROR;
         }
 
-        // fcntl(client_socket, F_SETFL, O_NONBLOCK);
-
         char ip[16];
         inet_ntop(AF_INET, &address, ip, address_length);
-
         printf("Connected to %s\n", ip);
 
-        char buf[BUFSIZ];
-        int read_size = 0;
-        while((read_size = recv(client_socket, buf, BUFSIZ-1, 0)) > 0) {
-            send(client_socket, buf, read_size, 0);
-        }
-        
-        close(client_socket);
-    // }
+        thrd_t thread;
+        int* socket_ptr = malloc(sizeof(int));
+        *socket_ptr = client_socket;
+        thrd_create(&thread, &handleRequest, socket_ptr);
+    }
 
     shutdown(server_socket, SHUT_RDWR);
     close(server_socket);
