@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-cc -std=c11 cun.c -o cun -fsanitize=address
+cc -std=c11 cun.c -o cun -fsanitize=address -g3
 if [ $? -eq 0 ]; then
     ./cun "$@"
 fi

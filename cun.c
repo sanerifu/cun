@@ -1,3 +1,6 @@
+#include "result.c"
+#include "str.c"
+
 #include <stdio.h>
 
 #include <stdlib.h>
@@ -11,23 +14,54 @@
 #include <fcntl.h>
 #include <threads.h>
 
-typedef enum {
-    SUCCESS,
-    SOCKET_ERROR,
-    BIND_ERROR,
-    LISTEN_ERROR,
-    ACCEPT_ERROR,
-} Result;
+static void freeWrapper(void* data) {
+    free(*(void**)data);
+}
 
-static int handleRequest(void* socket_ptr) {
-    int socket = *(int*)socket_ptr;
-    char buf[BUFSIZ];
-    int read_size = 0;
-    while((read_size = recv(socket, buf, BUFSIZ-1, 0)) > 0) {
-        send(socket, buf, read_size, 0);
+static void closeWrapper(void* data) {
+    close(*(int*)data);
+}
+
+#define CLEAN(f) __attribute__((cleanup(f##Wrapper)))
+
+static Result readRequest(String* o_request, int socket) {
+    Result result = SUCCESS;
+    String request = NULL;
+    if((result = strCreate(&request, BUFSIZ))) {
+        fprintf(stderr, "Could not create string\n");
+        return result;
     }
-    close(socket);
-    free(socket_ptr);
+    {
+        char buf[BUFSIZ];
+        int read_size = 0;
+        while((read_size = recv(socket, buf, BUFSIZ-1, 0)) != 0) {
+            if(read_size < 0) {
+                fprintf(stderr, "Could not receive: %s\n", strerror(errno));
+                return RECEIVE_ERROR;
+            }
+            if((result = strAppendBuffer(&request, buf, read_size))) {
+                fprintf(stderr, "Could not append the read buffer\n");
+                return result;
+            }
+        }
+    }
+    *o_request = request;
+    return SUCCESS;
+}
+
+static int requestHandler(void* socket_ptr) {
+    void* CLEAN(free) _socket_ptr_copy = socket_ptr;
+
+    Result result = SUCCESS;
+    int socket = *(int*)socket_ptr;
+    String CLEAN(free) request = NULL;
+
+    if((result = readRequest(&request, socket))) {
+        fprintf(stderr, "Could not read request\n");
+        return result;
+    }
+
+    send(socket, request->data, request->length, 0);
     return SUCCESS;
 }
 
@@ -77,7 +111,7 @@ static Result serverLoop() {
         thrd_t thread;
         int* socket_ptr = malloc(sizeof(int));
         *socket_ptr = client_socket;
-        thrd_create(&thread, &handleRequest, socket_ptr);
+        thrd_create(&thread, &requestHandler, socket_ptr);
     }
 
     shutdown(server_socket, SHUT_RDWR);
