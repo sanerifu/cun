@@ -1,5 +1,5 @@
 #include "result.c"
-#include "str.c"
+#include "string_builder.c"
 
 #include <stdio.h>
 
@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include <fcntl.h>
 #include <threads.h>
+#include "arena.c"
 
 static void freeWrapper(void* data) {
     free(*(void**)data);
@@ -22,15 +23,16 @@ static void closeWrapper(void* data) {
     close(*(int*)data);
 }
 
+static void arenaDestroyWrapper(void* data) {
+    arenaDestroy((Arena*)data);
+}
+
 #define CLEAN(f) __attribute__((cleanup(f##Wrapper)))
 
-static Result readRequest(String* o_request, int socket) {
+static Result readRequest(char** o_request, size_t* o_length, int socket, Arena* allocator) {
     Result result = SUCCESS;
-    String request = NULL;
-    if((result = strCreate(&request, BUFSIZ))) {
-        fprintf(stderr, "Could not create string\n");
-        return result;
-    }
+    Arena CLEAN(arenaDestroy) temp_allocator = NULL;
+    StringBuilder request_builder = NULL;
     {
         char buf[BUFSIZ];
         int read_size = 0;
@@ -39,29 +41,37 @@ static Result readRequest(String* o_request, int socket) {
                 fprintf(stderr, "Could not receive: %s\n", strerror(errno));
                 return RECEIVE_ERROR;
             }
-            if((result = strAppendBuffer(&request, buf, read_size))) {
+            if((result = stringAppendBuffer(&request_builder, buf, read_size, &temp_allocator))) {
                 fprintf(stderr, "Could not append the read buffer\n");
                 return result;
             }
+            if(strstr(buf, "\r\n\r\n") != NULL) {
+                break;
+            }
         }
     }
-    *o_request = request;
+    if((result = stringBuild(o_request, o_length, &request_builder, allocator))) {
+        fprintf(stderr, "Could not build request string\n");
+        return result;
+    }
     return SUCCESS;
 }
 
 static int requestHandler(void* socket_ptr) {
     void* CLEAN(free) _socket_ptr_copy = socket_ptr;
 
+    Arena allocator = NULL;
     Result result = SUCCESS;
     int socket = *(int*)socket_ptr;
-    String CLEAN(free) request = NULL;
+    char* request = NULL;
+    size_t length = 0;
 
-    if((result = readRequest(&request, socket))) {
+    if((result = readRequest(&request, &length, socket, &allocator))) {
         fprintf(stderr, "Could not read request\n");
         return result;
     }
 
-    send(socket, request->data, request->length, 0);
+    send(socket, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nHello, World!", sizeof("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nHello, World!") - 1, 0);
     return SUCCESS;
 }
 
