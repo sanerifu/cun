@@ -1,7 +1,10 @@
+#include <iso646.h>
+
 #include "result.c"
 #include "string_builder.c"
 
 #include <stdio.h>
+#include <readline/readline.h>
 
 #include <stdlib.h>
 #include <arpa/inet.h>
@@ -75,9 +78,45 @@ static int requestHandler(void* socket_ptr) {
     return SUCCESS;
 }
 
-static Result serverLoop() {
-    int server_socket = socket(AF_INET, SOCK_STREAM, 0);
+static int serverLoop(void* sock) {
+    int server_socket = *(int*)sock;
     int client_socket = 0;
+    struct sockaddr_in address = {0};
+    socklen_t address_length = sizeof(address);
+
+    while(true) {
+        if(listen(server_socket, 3) < 0) {
+            fprintf(stderr, "Listening Error: %s\n", strerror(errno));
+            close(server_socket);
+            return LISTEN_ERROR;
+        }
+
+        if((client_socket = accept(server_socket, (struct sockaddr*)&address, &address_length)) < 0) {
+            if(errno == EINVAL) {
+                fprintf(stderr, "Closing...\n");
+                break;
+            }
+            fprintf(stderr, "Accepting Error: %d %s\n", errno, strerror(errno));
+            // close(server_socket);
+            return ACCEPT_ERROR;
+        }
+
+        char ip[16];
+        inet_ntop(AF_INET, &address, ip, address_length);
+        printf("Connected to %s\n", ip);
+
+        thrd_t thread;
+        int* socket_ptr = malloc(sizeof(int));
+        *socket_ptr = client_socket;
+        thrd_create(&thread, &requestHandler, socket_ptr);
+    }
+
+    close(server_socket);
+    return SUCCESS;
+}
+
+int main() {
+    int server_socket = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in address = {
         .sin_family = AF_INET,
         .sin_addr.s_addr = INADDR_ANY,
@@ -101,34 +140,25 @@ static Result serverLoop() {
         return BIND_ERROR;
     }
 
+    thrd_t server_thread;
+    thrd_create(&server_thread, &serverLoop, &server_socket);
+
     while(true) {
-        if(listen(server_socket, 3) < 0) {
-            fprintf(stderr, "Listening Error: %s\n", strerror(errno));
-            close(server_socket);
-            return LISTEN_ERROR;
+        char* line = readline("> ");
+        if(strcmp(line, "exit") == 0) {
+            fprintf(stderr, "Shutting down the server\n");
+            free(line);
+            break;
+        } else {
+            fprintf(stderr, "Unrecognized command: \"%s\"\n", line);
         }
-
-        if((client_socket = accept(server_socket, (struct sockaddr*)&address, &address_length)) < 0) {
-            fprintf(stderr, "Accepting Error: %s\n", strerror(errno));
-            close(server_socket);
-            return ACCEPT_ERROR;
-        }
-
-        char ip[16];
-        inet_ntop(AF_INET, &address, ip, address_length);
-        printf("Connected to %s\n", ip);
-
-        thrd_t thread;
-        int* socket_ptr = malloc(sizeof(int));
-        *socket_ptr = client_socket;
-        thrd_create(&thread, &requestHandler, socket_ptr);
+        free(line);
     }
 
     shutdown(server_socket, SHUT_RDWR);
-    close(server_socket);
-    return SUCCESS;
-}
 
-int main() {
-    serverLoop();
+    int server_result;
+    thrd_join(server_thread, &server_result);
+
+    return server_result;
 }
