@@ -74,4 +74,8 @@ static Result stringBuild(char** o_data, size_t* o_length, StringBuilder const* 
     return SUCCESS;
 }
 
+static size_t stringBuilderLength(StringBuilder i_self) {
+    return i_self == NULL ? 0 : i_self->total_length;
+}
+
 #endif 
