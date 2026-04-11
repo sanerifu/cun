@@ -17,6 +17,7 @@
 #include <fcntl.h>
 #include <threads.h>
 #include "arena.c"
+#include "str.c"
 
 static void freeWrapper(void* data) {
     free(*(void**)data);
@@ -64,14 +65,18 @@ static int requestHandler(void* socket_ptr) {
     Arena allocator = NULL;
     Result result = SUCCESS;
     int socket = *(int*)socket_ptr;
-    char* request = NULL;
-    size_t length = 0;
+
+    char* header = NULL;
+    size_t header_length = 0;
     char* body = NULL;
     size_t body_length = 0;
 
-    if((result = readRequest(&request, &length, &body, &body_length, socket, &allocator))) {
-        fprintf(stderr, "Could not read request\n");
-        return result;
+    CATCH(readRequest(&header, &header_length, &body, &body_length, socket, &allocator), "Could not read request\n");
+
+    char* line = NULL;
+    size_t line_length = 0;
+    while((line = stringSplit(&line_length, &header, &header_length, "\r\n", STRING_NULL_TERMINATED))) {
+        printf("Header: \"%.*s\"\n", (int)line_length, line);
     }
 
     send(socket, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nHello, World!", sizeof("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nHello, World!") - 1, 0);
@@ -85,11 +90,7 @@ static int serverLoop(void* sock) {
     socklen_t address_length = sizeof(address);
 
     while(true) {
-        if(listen(server_socket, 3) < 0) {
-            fprintf(stderr, "Listening Error: %s\n", strerror(errno));
-            close(server_socket);
-            return LISTEN_ERROR;
-        }
+        WRAP(LISTEN_ERROR, listen(server_socket, 3), "Listening Error: %s\n", strerror(errno));
 
         if((client_socket = accept(server_socket, (struct sockaddr*)&address, &address_length)) < 0) {
             if(errno == EINVAL) {
@@ -97,7 +98,6 @@ static int serverLoop(void* sock) {
                 break;
             }
             fprintf(stderr, "Accepting Error: %d %s\n", errno, strerror(errno));
-            // close(server_socket);
             return ACCEPT_ERROR;
         }
 
@@ -116,7 +116,7 @@ static int serverLoop(void* sock) {
 }
 
 int main() {
-    int server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    int CLEAN(close) server_socket = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in address = {
         .sin_family = AF_INET,
         .sin_addr.s_addr = INADDR_ANY,
@@ -124,10 +124,7 @@ int main() {
     };
     socklen_t address_length = sizeof(address);
 
-    if(server_socket < 0) {
-        fprintf(stderr, "Socket Error: %s\n", strerror(errno));
-        return SOCKET_ERROR;
-    }
+    WRAP(SOCKET_ERROR, server_socket, "Socket Error: %s\n", strerror(errno));
 
     {
         int option = 1;

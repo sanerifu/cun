@@ -20,10 +20,7 @@ static Result stringAppendChar(StringBuilder* io_self, char c, Arena* allocator)
     StringBuilder self = *io_self;
     size_t previous_total_length = self == NULL ? 0 : self->total_length;
     StringBuilder next = NULL;
-    if((result = arenaAllocate(&next, allocator, sizeof(struct StringBuilder) + 1))) {
-        fprintf(stderr, "Could not append char \'%c\'\n", c);
-        return result;
-    }
+    CATCH(arenaAllocate(&next, allocator, sizeof(struct StringBuilder) + 1), "Could not append char \'%c\'\n", c);
 
     next->prev = self;
     next->length = 1;
@@ -40,10 +37,7 @@ static Result stringAppendBuffer(StringBuilder* io_self, char const* string, siz
     StringBuilder self = *io_self;
     size_t previous_total_length = self == NULL ? 0 : self->total_length;
     StringBuilder next = NULL;
-    if((result = arenaAllocate(&next, allocator, sizeof(struct StringBuilder) + length))) {
-        fprintf(stderr, "Could not append string \"%s\"\n", string);
-        return result;
-    }
+    CATCH(arenaAllocate(&next, allocator, sizeof(struct StringBuilder) + length), "Could not append string \"%s\"\n", string);
 
     next->prev = self;
     next->length = length;
@@ -64,10 +58,7 @@ static Result stringBuild(char** o_data, size_t* o_length, StringBuilder const* 
     StringBuilder self = *i_self;
     size_t length = self->total_length;
     char* data = NULL;
-    if((result = arenaAllocate(&data, allocator, length + 1))) {
-        fprintf(stderr, "Could not build string of length %zu\n", length);
-        return result;
-    }
+    CATCH(arenaAllocate(&data, allocator, length + 1), "Could not build string of length %zu\n", length);
     data[length] = '\0';
 
     size_t offset = length;
