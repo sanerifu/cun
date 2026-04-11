@@ -32,31 +32,29 @@ static void arenaDestroyWrapper(void* data) {
 
 #define CLEAN(f) __attribute__((cleanup(f##Wrapper)))
 
-static Result readRequest(char** o_request, size_t* o_length, int socket, Arena* allocator) {
+static Result readRequest(char** o_header, size_t* o_header_length, char** o_body, size_t* o_body_length, int socket, Arena* allocator) {
     Result result = SUCCESS;
     Arena CLEAN(arenaDestroy) temp_allocator = NULL;
-    StringBuilder request_builder = NULL;
+    StringBuilder header_builder = NULL;
+    StringBuilder body_builder = NULL;
     {
         char buf[BUFSIZ];
         int read_size = 0;
         while((read_size = recv(socket, buf, BUFSIZ-1, 0)) != 0) {
-            if(read_size < 0) {
-                fprintf(stderr, "Could not receive: %s\n", strerror(errno));
-                return RECEIVE_ERROR;
-            }
-            if((result = stringAppendBuffer(&request_builder, buf, read_size, &temp_allocator))) {
-                fprintf(stderr, "Could not append the read buffer\n");
-                return result;
-            }
-            if(strstr(buf, "\r\n\r\n") != NULL) {
+            WRAP(RECEIVE_ERROR, read_size, "Could not receive: %s\n", strerror(errno));
+            char* end_position = strstr(buf, "\r\n\r\n");
+            if(end_position != NULL) {
+                size_t last_header_length = end_position - buf;
+                CATCH(stringAppendBuffer(&header_builder, buf, last_header_length, &temp_allocator), "Could not push last part of header");
+                CATCH(stringAppendBuffer(&body_builder, end_position + 4, read_size - last_header_length - 4, &temp_allocator), "Could not push first part of body");
                 break;
             }
+            CATCH(stringAppendBuffer(&header_builder, buf, read_size, &temp_allocator), "Could not append the read buffer\n");
         }
     }
-    if((result = stringBuild(o_request, o_length, &request_builder, allocator))) {
-        fprintf(stderr, "Could not build request string\n");
-        return result;
-    }
+    CATCH(stringBuild(o_header, o_header_length, &header_builder, allocator), "Could not build request header string\n");
+    CATCH(stringBuild(o_body, o_body_length, &body_builder, allocator), "Could not build request body string\n");
+
     return SUCCESS;
 }
 
@@ -68,8 +66,10 @@ static int requestHandler(void* socket_ptr) {
     int socket = *(int*)socket_ptr;
     char* request = NULL;
     size_t length = 0;
+    char* body = NULL;
+    size_t body_length = 0;
 
-    if((result = readRequest(&request, &length, socket, &allocator))) {
+    if((result = readRequest(&request, &length, &body, &body_length, socket, &allocator))) {
         fprintf(stderr, "Could not read request\n");
         return result;
     }

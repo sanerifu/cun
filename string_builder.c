@@ -1,5 +1,5 @@
-#ifndef __STR_C__
-#define __STR_C__
+#ifndef __STRING_BUILDER_C__
+#define __STRING_BUILDER_C__
 
 #include <stdlib.h>
 #include <stddef.h>
