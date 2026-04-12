@@ -1,25 +1,32 @@
 #ifndef __STR_C__
 #define __STR_C__
 
+#include <ctype.h>
+#include <iso646.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
-#include <stdbool.h>
-#include <iso646.h>
-#include <ctype.h>
-#include "result.c"
+
 #include "arena.c"
+#include "result.c"
 
 enum {
     STRING_NULL_TERMINATED = 0,
 };
 
-static char* stringSplit(size_t* o_ret_length, char** io_string, size_t* io_string_length, char const* i_delimiter, size_t i_delimiter_length) {
-    if(i_delimiter_length == STRING_NULL_TERMINATED) {
+static char* stringSplit(
+    size_t* o_ret_length,
+    char** io_string,
+    size_t* io_string_length,
+    char const* i_delimiter,
+    size_t i_delimiter_length
+) {
+    if (i_delimiter_length == STRING_NULL_TERMINATED) {
         i_delimiter_length = strlen(i_delimiter);
     }
     char* string = *io_string;
     size_t string_length = *io_string_length;
-    if(string_length < i_delimiter_length) {
+    if (string_length < i_delimiter_length) {
         *o_ret_length = 0;
         return NULL;
     }
@@ -27,15 +34,15 @@ static char* stringSplit(size_t* o_ret_length, char** io_string, size_t* io_stri
     size_t ret_length = 0;
     bool found = false;
 
-    while((string_length - ret_length) >= i_delimiter_length) {
-        if(memcmp(string + ret_length, i_delimiter, i_delimiter_length) == 0) {
+    while ((string_length - ret_length) >= i_delimiter_length) {
+        if (memcmp(string + ret_length, i_delimiter, i_delimiter_length) == 0) {
             found = true;
             break;
         }
         ret_length += 1;
     }
 
-    if(found) {
+    if (found) {
         string_length -= ret_length + i_delimiter_length;
         string += ret_length + i_delimiter_length;
     } else {
@@ -53,11 +60,11 @@ static void stringTrim(char** io_string, size_t* io_string_length) {
     char* string = *io_string;
     size_t string_length = *io_string_length;
 
-    while(isblank(string[0])) {
+    while (isblank(string[0])) {
         string += 1;
         string_length -= 1;
     }
-    while(isblank(string[string_length - 1])) {
+    while (isblank(string[string_length - 1])) {
         string_length -= 1;
     }
 

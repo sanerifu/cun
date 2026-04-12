@@ -1,10 +1,11 @@
 #ifndef __ARENA_C__
 #define __ARENA_C__
 
-#include "result.c"
 #include <stddef.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+
+#include "result.c"
 
 typedef struct Arena* Arena;
 struct Arena {
@@ -16,19 +17,19 @@ struct Arena {
 
 static Result arenaAllocate(void* o_ret, Arena* io_self, size_t size) {
     Arena self = *io_self;
-    if(self == NULL) {
+    if (self == NULL) {
         self = malloc(sizeof(struct Arena) + size);
-        if(self == NULL) {
+        if (self == NULL) {
             fprintf(stderr, "Out of memory!\n");
             return OUT_OF_MEMORY;
         }
         self->capacity = size;
         self->size = 0;
         self->prev = NULL;
-    } else if(self->capacity - self->size < size) {
+    } else if (self->capacity - self->size < size) {
         size_t new_size = size > self->capacity * 2 ? size : self->capacity * 2;
         Arena new_node = malloc(sizeof(struct Arena) + new_size);
-        if(new_node == NULL) {
+        if (new_node == NULL) {
             fprintf(stderr, "Out of memory!\n");
             return OUT_OF_MEMORY;
         }
@@ -46,12 +47,16 @@ static Result arenaAllocate(void* o_ret, Arena* io_self, size_t size) {
 
 static void arenaDestroy(Arena* io_self) {
     Arena self = *io_self;
-    while(self != NULL) {
+    while (self != NULL) {
         Arena prev = self->prev;
         free(self);
         self = prev;
     }
     *io_self = NULL;
+}
+
+static void arenaDestroyWrapper(void* data) {
+    arenaDestroy((Arena*)data);
 }
 
 #endif

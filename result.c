@@ -12,9 +12,16 @@ typedef enum {
     SEND_ERROR
 } Result;
 
-#define CATCH(expr, ...) \
-    if((result = expr)) { fprintf(stderr, ##__VA_ARGS__); return result; }
+#define CATCH(expr, ...)                \
+    if ((result = expr)) {              \
+        fprintf(stderr, ##__VA_ARGS__); \
+        return result;                  \
+    }
 
-#define WRAP(result, expr, ...) if((expr) < 0) { fprintf(stderr, ##__VA_ARGS__); return result; }
+#define WRAP(result, expr, ...)         \
+    if ((expr) < 0) {                   \
+        fprintf(stderr, ##__VA_ARGS__); \
+        return result;                  \
+    }
 
 #endif

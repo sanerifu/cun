@@ -1,11 +1,12 @@
 #ifndef __STRING_BUILDER_C__
 #define __STRING_BUILDER_C__
 
-#include <stdlib.h>
 #include <stddef.h>
-#include "result.c"
-#include "arena.c"
+#include <stdlib.h>
 #include <string.h>
+
+#include "arena.c"
+#include "result.c"
 
 typedef struct StringBuilder* StringBuilder;
 struct StringBuilder {
@@ -37,7 +38,11 @@ static Result stringAppendBuffer(StringBuilder* io_self, char const* string, siz
     StringBuilder self = *io_self;
     size_t previous_total_length = self == NULL ? 0 : self->total_length;
     StringBuilder next = NULL;
-    CATCH(arenaAllocate(&next, allocator, sizeof(struct StringBuilder) + length), "Could not append string \"%s\"\n", string);
+    CATCH(
+        arenaAllocate(&next, allocator, sizeof(struct StringBuilder) + length),
+        "Could not append string \"%s\"\n",
+        string
+    );
 
     next->prev = self;
     next->length = length;
@@ -62,7 +67,7 @@ static Result stringBuild(char** o_data, size_t* o_length, StringBuilder const* 
     data[length] = '\0';
 
     size_t offset = length;
-    while(self != NULL) {
+    while (self != NULL) {
         memcpy(data + offset - self->length, self->data, self->length);
         offset -= self->length;
         StringBuilder prev = self->prev;
@@ -78,4 +83,4 @@ static size_t stringBuilderLength(StringBuilder i_self) {
     return i_self == NULL ? 0 : i_self->total_length;
 }
 
-#endif 
+#endif
