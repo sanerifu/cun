@@ -27,10 +27,8 @@ struct RequestHeader {
 };
 
 static Result readRequest(
-    char** o_header,
-    size_t* o_header_length,
-    char** o_body,
-    size_t* o_body_length,
+    String* o_header,
+    String* o_body,
     int socket,
     Arena* allocator
 ) {
@@ -41,21 +39,21 @@ static Result readRequest(
     size_t initial_body_length = 0;
     {
         char buf[BUFSIZ];
+        String buffer = LSTRING(buf, sizeof(buf));
         int read_size = 0;
-        while ((read_size = recv(socket, buf, BUFSIZ - 1, 0)) != 0) {
+        while ((read_size = recv(socket, buffer.data, buffer.length - 1, 0)) != 0) {
             WRAP(RECEIVE_ERROR, read_size, "Could not receive: %s\n", strerror(errno));
             char* end_position = strstr(buf, "\r\n\r\n");
             if (end_position != NULL) {
                 size_t last_header_length = end_position - buf;
                 CATCH(
-                    stringAppendBuffer(&header_builder, buf, last_header_length, &temp_allocator),
+                    stringAppend(&header_builder, LSTRING(buffer.data, last_header_length), &temp_allocator),
                     "Could not push last part of header"
                 );
                 CATCH(
-                    stringAppendBuffer(
+                    stringAppend(
                         &body_builder,
-                        end_position + 4,
-                        read_size - last_header_length - 4,
+                        LSTRING(end_position + 4, read_size - last_header_length - 4),
                         &temp_allocator
                     ),
                     "Could not push first part of body"
@@ -63,28 +61,35 @@ static Result readRequest(
                 break;
             }
             CATCH(
-                stringAppendBuffer(&header_builder, buf, read_size, &temp_allocator),
+                stringAppend(&header_builder, LSTRING(buffer.data, read_size), &temp_allocator),
                 "Could not append the read buffer\n"
             );
         }
     }
-    CATCH(
-        stringBuild(o_header, o_header_length, &header_builder, allocator),
-        "Could not build request header string\n"
-    );
 
     String header = {0};
     String body = {0};
 
+    CATCH(
+        stringBuild(&header, &header_builder, allocator),
+        "Could not build request header string\n"
+    );
+
+    String header_copy = header;
+
+
     {
         String line = {0};
-        while ((line = stringSplit(&header, STRING_LITERAL("\r\n"))).data) {
+        while ((line = stringSplit(&header_copy, STRING_LITERAL("\r\n"))).data) {
             String key = stringSplit(&line, STRING_LITERAL(":"));
             String value = stringTrim(line);
 
             if (stringCompare(key, STRING_LITERAL("Content-Length")) == 0) {
                 String value_copy = {0};
-                CATCH(stringDuplicate(&value_copy, value, &temp_allocator), "Could not duplicate content length to null-terminated string");
+                CATCH(
+                    stringDuplicate(&value_copy, value, &temp_allocator),
+                    "Could not duplicate content length to null-terminated string"
+                );
                 body.length = strtoull(value_copy.data, NULL, 10);
                 break;
             }
@@ -99,9 +104,12 @@ static Result readRequest(
             "Could not allocate remaining body buffer\n"
         );
         WRAP(RECEIVE_ERROR, recv(socket, remaining_body, remaining_body_length, 0), "Could not read remaining body\n");
-        stringAppendBuffer(&body_builder, remaining_body, remaining_body_length, &temp_allocator);
+        stringAppend(&body_builder, LSTRING(remaining_body, remaining_body_length), &temp_allocator);
     }
-    CATCH(stringBuild(o_body, o_body_length, &body_builder, allocator), "Could not build request body string\n");
+    CATCH(stringBuild(&body, &body_builder, allocator), "Could not build request body string\n");
+
+    *o_header = header;
+    *o_body = body;
 
     return SUCCESS;
 }

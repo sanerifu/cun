@@ -31,14 +31,12 @@ static int requestHandler(void* socket_ptr) {
     Result result = SUCCESS;
     int socket = *(int*)socket_ptr;
 
-    char* header = NULL;
-    size_t header_length = 0;
-    char* body = NULL;
-    size_t body_length = 0;
+    String header = {0};
+    String body = {0};
 
-    CATCH(readRequest(&header, &header_length, &body, &body_length, socket, &allocator), "Could not read request\n");
+    CATCH(readRequest(&header, &body, socket, &allocator), "Could not read request\n");
 
-    printf("Header \"%.*s\"\nBody \"%.*s\"\n", (int)header_length, header, (int)body_length, body);
+    printf("Header \"%.*s\"\nBody \"%.*s\"\n", FORMAT(header), FORMAT(body));
 
     send(
         socket,

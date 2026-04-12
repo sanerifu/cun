@@ -16,12 +16,11 @@ struct String {
     char* data;
 };
 
-#define STRING_LITERAL(literal) ((String){.length = sizeof(literal) - 1, .data = (char*)(literal)})
-#define ZSTRING(zstr) ((String){.length = strlen((zstr)), .data = (zstr)})
-
-enum {
-    STRING_NULL_TERMINATED = 0,
-};
+#define LSTRING(_data, _length) ((String){.length = (_length), .data = (_data)})
+#define STRING_LITERAL(literal) LSTRING((literal), sizeof((literal)) - 1)
+#define ZSTRING(zstr) LSTRING((zstr), strlen((zstr)))
+#define CHAR_STRING(c) LSTRING(((char[]){(c)}), 1)
+#define FORMAT(s) (int)((s).length), (s).data
 
 static String stringSplit(String* io_string, String delimiter) {
     String string = *io_string;
@@ -64,7 +63,7 @@ static String stringTrim(String string) {
         end -= 1;
     }
 
-    return (String){.length = end - start, .data = string.data + start};
+    return (String){.length = end - start + 1, .data = string.data + start};
 }
 
 static int stringCompare(String left, String right) {
