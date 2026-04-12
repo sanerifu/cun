@@ -10,6 +10,22 @@
 #include "str.c"
 #include "string_builder.c"
 
+typedef enum {
+    GET_REQUEST,
+    POST_REQUEST,
+    HEAD_REQUEST,
+    PUT_REQUEST,
+    PATCH_REQUEST,
+    DELETE_REQUEST
+} RequestMethod;
+
+typedef struct RequestHeader RequestHeader;
+struct RequestHeader {
+    RequestMethod method;
+
+    size_t content_length;
+};
+
 static Result readRequest(
     char** o_header,
     size_t* o_header_length,
@@ -57,33 +73,25 @@ static Result readRequest(
         "Could not build request header string\n"
     );
 
-    char* header = *o_header;
-    size_t header_length = *o_header_length;
-
-    char* body = NULL;
-    size_t body_length = 0;
+    String header = {0};
+    String body = {0};
 
     {
-        char* line = NULL;
-        size_t line_length = 0;
-        while ((line = stringSplit(&line_length, &header, &header_length, "\r\n", STRING_NULL_TERMINATED))) {
-            size_t key_length = 0;
-            char* key = stringSplit(&key_length, &line, &line_length, ":", STRING_NULL_TERMINATED);
+        String line = {0};
+        while ((line = stringSplit(&header, STRING_LITERAL("\r\n"))).data) {
+            String key = stringSplit(&line, STRING_LITERAL(":"));
+            String value = stringTrim(line);
 
-            size_t value_length = line_length;
-            char* value = line;
-            stringTrim(&value, &value_length);
-
-            if (stringCompare(key, key_length, "Content-Length", STRING_NULL_TERMINATED) == 0) {
-                char* value_copy = NULL;
-                stringDuplicate(&value_copy, value, value_length, &temp_allocator);
-                body_length = strtoull(value_copy, NULL, 10);
+            if (stringCompare(key, STRING_LITERAL("Content-Length")) == 0) {
+                String value_copy = {0};
+                CATCH(stringDuplicate(&value_copy, value, &temp_allocator), "Could not duplicate content length to null-terminated string");
+                body.length = strtoull(value_copy.data, NULL, 10);
                 break;
             }
         }
     }
 
-    size_t remaining_body_length = body_length - stringBuilderLength(body_builder);
+    size_t remaining_body_length = body.length - stringBuilderLength(body_builder);
     if (remaining_body_length > 0) {
         char* remaining_body = NULL;
         CATCH(

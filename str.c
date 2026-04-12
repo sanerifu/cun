@@ -10,82 +10,81 @@
 #include "arena.c"
 #include "result.c"
 
+typedef struct String String;
+struct String {
+    size_t length;
+    char* data;
+};
+
+#define STRING_LITERAL(literal) ((String){.length = sizeof(literal) - 1, .data = (char*)(literal)})
+#define ZSTRING(zstr) ((String){.length = strlen((zstr)), .data = (zstr)})
+
 enum {
     STRING_NULL_TERMINATED = 0,
 };
 
-static char* stringSplit(
-    size_t* o_ret_length,
-    char** io_string,
-    size_t* io_string_length,
-    char const* i_delimiter,
-    size_t i_delimiter_length
-) {
-    if (i_delimiter_length == STRING_NULL_TERMINATED) {
-        i_delimiter_length = strlen(i_delimiter);
+static String stringSplit(String* io_string, String delimiter) {
+    String string = *io_string;
+    if (string.length < delimiter.length) {
+        return (String){.length = 0, .data = NULL};
     }
-    char* string = *io_string;
-    size_t string_length = *io_string_length;
-    if (string_length < i_delimiter_length) {
-        *o_ret_length = 0;
-        return NULL;
-    }
-    char* ret = string;
-    size_t ret_length = 0;
+    String ret = (String){.length = 0, .data = string.data};
     bool found = false;
 
-    while ((string_length - ret_length) >= i_delimiter_length) {
-        if (memcmp(string + ret_length, i_delimiter, i_delimiter_length) == 0) {
+    while ((string.length - ret.length) >= delimiter.length) {
+        if (memcmp(string.data + ret.length, delimiter.data, delimiter.length) == 0) {
             found = true;
             break;
         }
-        ret_length += 1;
+        ret.length += 1;
     }
 
     if (found) {
-        string_length -= ret_length + i_delimiter_length;
-        string += ret_length + i_delimiter_length;
+        string.length -= ret.length + delimiter.length;
+        string.data += ret.length + delimiter.length;
     } else {
-        ret_length = string_length;
-        string_length = 0;
+        ret.length = string.length;
+        string.length = 0;
     }
 
     *io_string = string;
-    *io_string_length = string_length;
-    *o_ret_length = ret_length;
     return ret;
 }
 
-static void stringTrim(char** io_string, size_t* io_string_length) {
-    char* string = *io_string;
-    size_t string_length = *io_string_length;
-
-    while (isblank(string[0])) {
-        string += 1;
-        string_length -= 1;
+static String stringTrim(String string) {
+    if (string.length == 0) {
+        return string;
     }
-    while (isblank(string[string_length - 1])) {
-        string_length -= 1;
+    size_t start = 0;
+    size_t end = string.length - 1;
+    while (start < string.length and isblank(string.data[start])) {
+        start += 1;
+    }
+    while (end > 0 and isblank(string.data[end])) {
+        end -= 1;
     }
 
-    *io_string = string;
-    *io_string_length = string_length;
+    return (String){.length = end - start, .data = string.data + start};
 }
 
-static int stringCompare(char const* i_left, size_t i_left_length, char const* i_right, size_t i_right_length) {
-    i_left_length = i_left_length == STRING_NULL_TERMINATED ? strlen(i_left) : i_left_length;
-    i_right_length = i_right_length == STRING_NULL_TERMINATED ? strlen(i_right) : i_right_length;
-
-    size_t min_length = i_left_length < i_right_length ? i_left_length : i_right_length;
-
-    return memcmp(i_left, i_right, min_length);
+static int stringCompare(String left, String right) {
+    size_t min_length = left.length < right.length ? left.length : right.length;
+    int result = memcmp(left.data, right.data, min_length);
+    if (result == 0) {
+        return (int)left.length - (int)right.length;
+    } else {
+        return result;
+    }
 }
 
-static Result stringDuplicate(char** o_string, char const* i_string, size_t i_string_length, Arena* allocator) {
+static Result stringDuplicate(String* o_ret, String string, Arena* allocator) {
     Result result = SUCCESS;
-    CATCH(arenaAllocate(o_string, allocator, i_string_length + 1), "Could not duplicate string\n");
-    memcpy(*o_string, i_string, i_string_length);
-    (*o_string)[i_string_length] = '\0';
+    String ret;
+    CATCH(arenaAllocate(&ret.data, allocator, string.length + 1), "Could not duplicate string\n");
+    memcpy(ret.data, string.data, string.length);
+    ret.length = string.length;
+    ret.data[ret.length] = '\0';
+    *o_ret = ret;
     return SUCCESS;
 }
 
