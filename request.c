@@ -22,16 +22,11 @@ typedef enum {
 typedef struct RequestHeader RequestHeader;
 struct RequestHeader {
     RequestMethod method;
-
+    String user_agent;
     size_t content_length;
 };
 
-static Result readRequest(
-    String* o_header,
-    String* o_body,
-    int socket,
-    Arena* allocator
-) {
+static Result readRequest(String* o_header, String* o_body, int socket, Arena* allocator) {
     Result result = SUCCESS;
     Arena CLEAN(arenaDestroy) temp_allocator = NULL;
     StringBuilder header_builder = NULL;
@@ -70,13 +65,9 @@ static Result readRequest(
     String header = {0};
     String body = {0};
 
-    CATCH(
-        stringBuild(&header, &header_builder, allocator),
-        "Could not build request header string\n"
-    );
+    CATCH(stringBuild(&header, &header_builder, allocator), "Could not build request header string\n");
 
     String header_copy = header;
-
 
     {
         String line = {0};
@@ -112,6 +103,45 @@ static Result readRequest(
     *o_body = body;
 
     return SUCCESS;
+}
+
+static Result parseRequestHeader(RequestHeader* o_ret, String header) {
+    Result result = SUCCESS;
+    String line = {0};
+    RequestHeader ret = {0};
+    Arena CLEAN(arenaDestroy) temp_allocator = NULL;
+
+    String http_start = stringSplit(&header, STRING_LITERAL("\r\n"));
+    String method = stringSplit(&http_start, STRING_LITERAL(" "));
+    if(stringCompare(method, STRING_LITERAL("GET")) == 0) {
+        ret.method = GET_REQUEST;
+    } else if(stringCompare(method, STRING_LITERAL("POST")) == 0) {
+        ret.method = POST_REQUEST;
+    } else if(stringCompare(method, STRING_LITERAL("HEAD")) == 0) {
+        ret.method = HEAD_REQUEST;
+    } else if(stringCompare(method, STRING_LITERAL("PUT")) == 0) {
+        ret.method = PUT_REQUEST;
+    } else if(stringCompare(method, STRING_LITERAL("PATCH")) == 0) {
+        ret.method = PATCH_REQUEST;
+    } else if(stringCompare(method, STRING_LITERAL("DELETE")) == 0) {
+        ret.method = DELETE_REQUEST;
+    } else {
+        fprintf(stderr, "Unrecognized HTTP method: \"%.*s\"\n", FORMAT(method));
+        return UNRECOGNIZED_HTTP_METHOD;
+    }
+
+    while((line = stringSplit(&header, STRING_LITERAL("\r\n"))).data) {
+        String key = stringSplit(&line, STRING_LITERAL(":"));
+        String value = line;
+
+        if(stringCompare(key, STRING_LITERAL("Content-Length")) == 0) {
+            String value_copy = {0};
+            CATCH(stringDuplicate(&value_copy, value, &temp_allocator), "Could not allocate null-terminated string for content length");
+            ret.content_length = strtoull(value_copy.data, NULL, 10);
+        }
+    }
+
+    *o_ret = ret;
 }
 
 #endif

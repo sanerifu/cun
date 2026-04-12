@@ -34,7 +34,10 @@ static int requestHandler(void* socket_ptr) {
     String header = {0};
     String body = {0};
 
+    RequestHeader parsed_header = {0};
+
     CATCH(readRequest(&header, &body, socket, &allocator), "Could not read request\n");
+    CATCH(parseRequestHeader(&parsed_header, header), "Could not parse header\n");
 
     printf("Header \"%.*s\"\nBody \"%.*s\"\n", FORMAT(header), FORMAT(body));
 
