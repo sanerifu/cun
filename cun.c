@@ -45,6 +45,8 @@ static int requestHandler(void* socket_ptr) {
     }
 
     printf("Method %d\n", parsed_header.method);
+    printf("Path \"%.*s\"\n", FORMAT(parsed_header.path));
+    printf("Version %04x\n", parsed_header.version);
     printf("User agent \"%.*s\"\n", FORMAT(parsed_header.user_agent));
     printf("Content length: %zu\n", parsed_header.content_length);
     printf("Body \"%.*s\"\n", FORMAT(body));

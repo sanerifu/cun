@@ -2,6 +2,7 @@
 #define __REQUEST_C__
 
 #include <errno.h>
+#include <stdint.h>
 #include <sys/socket.h>
 
 #include "arena.c"
@@ -19,15 +20,28 @@ typedef enum {
     DELETE_REQUEST
 } RequestMethod;
 
+typedef enum {
+    HTTP_1_0 = 0x0100,
+    HTTP_1_1 = 0x0101
+} HttpVersion;
+
 typedef struct RequestHeader RequestHeader;
 struct RequestHeader {
     RequestMethod method;
     String path;
+    HttpVersion version;
+
     String user_agent;
     size_t content_length;
 };
 
-static Result readRequestHeader(String* o_header, StringBuilder* o_body_builder, int socket, Arena* allocator, Arena* temp_allocator) {
+static Result readRequestHeader(
+    String* o_header,
+    StringBuilder* o_body_builder,
+    int socket,
+    Arena* allocator,
+    Arena* temp_allocator
+) {
     Result result = SUCCESS;
     StringBuilder header_builder = NULL;
     size_t initial_body_length = 0;
@@ -74,32 +88,45 @@ static Result parseRequestHeader(RequestHeader* o_ret, String header) {
 
     String http_start = stringSplit(&header, STRING_LITERAL("\r\n"));
     String method = stringSplit(&http_start, STRING_LITERAL(" "));
-    if(stringCompare(method, STRING_LITERAL("GET")) == 0) {
+    if (stringCompare(method, STRING_LITERAL("GET")) == 0) {
         ret.method = GET_REQUEST;
-    } else if(stringCompare(method, STRING_LITERAL("POST")) == 0) {
+    } else if (stringCompare(method, STRING_LITERAL("POST")) == 0) {
         ret.method = POST_REQUEST;
-    } else if(stringCompare(method, STRING_LITERAL("HEAD")) == 0) {
+    } else if (stringCompare(method, STRING_LITERAL("HEAD")) == 0) {
         ret.method = HEAD_REQUEST;
-    } else if(stringCompare(method, STRING_LITERAL("PUT")) == 0) {
+    } else if (stringCompare(method, STRING_LITERAL("PUT")) == 0) {
         ret.method = PUT_REQUEST;
-    } else if(stringCompare(method, STRING_LITERAL("PATCH")) == 0) {
+    } else if (stringCompare(method, STRING_LITERAL("PATCH")) == 0) {
         ret.method = PATCH_REQUEST;
-    } else if(stringCompare(method, STRING_LITERAL("DELETE")) == 0) {
+    } else if (stringCompare(method, STRING_LITERAL("DELETE")) == 0) {
         ret.method = DELETE_REQUEST;
     } else {
         fprintf(stderr, "Unrecognized HTTP method: \"%.*s\"\n", FORMAT(method));
         return UNRECOGNIZED_HTTP_METHOD;
     }
+    ret.path = stringSplit(&http_start, STRING_LITERAL(" "));
+    String http_version = stringSplit(&http_start, STRING_LITERAL(" "));
+    if(stringCompare(http_version, STRING_LITERAL("HTTP/1.1")) == 0) {
+        ret.version = HTTP_1_1;
+    } else if(stringCompare(http_version, STRING_LITERAL("HTTP/1.0")) == 0) {
+        ret.version = HTTP_1_0;
+    } else {
+        fprintf(stderr, "Unsupported HTTP version \"%.*s\"", FORMAT(http_version));
+        return UNSUPPORTED_HTTP_VERSION;
+    }
 
-    while((line = stringSplit(&header, STRING_LITERAL("\r\n"))).data) {
+    while ((line = stringSplit(&header, STRING_LITERAL("\r\n"))).data) {
         String key = stringSplit(&line, STRING_LITERAL(":"));
         String value = line;
 
-        if(stringCompare(key, STRING_LITERAL("Content-Length")) == 0) {
+        if (stringCompare(key, STRING_LITERAL("Content-Length")) == 0) {
             String value_copy = {0};
-            CATCH(stringDuplicate(&value_copy, value, &temp_allocator), "Could not allocate null-terminated string for content length");
+            CATCH(
+                stringDuplicate(&value_copy, value, &temp_allocator),
+                "Could not allocate null-terminated string for content length"
+            );
             ret.content_length = strtoull(value_copy.data, NULL, 10);
-        } else if(stringCompare(key, STRING_LITERAL("User-Agent")) == 0) {
+        } else if (stringCompare(key, STRING_LITERAL("User-Agent")) == 0) {
             ret.user_agent = stringTrim(value);
         }
     }
@@ -107,7 +134,14 @@ static Result parseRequestHeader(RequestHeader* o_ret, String header) {
     *o_ret = ret;
 }
 
-static Result readRequestBody(String* o_body, StringBuilder* io_body_builder, int socket, RequestHeader const* header, Arena* allocator, Arena* temp_allocator) {
+static Result readRequestBody(
+    String* o_body,
+    StringBuilder* io_body_builder,
+    int socket,
+    RequestHeader const* header,
+    Arena* allocator,
+    Arena* temp_allocator
+) {
     Result result;
 
     size_t remaining_body_length = header->content_length - stringBuilderLength(*io_body_builder);
