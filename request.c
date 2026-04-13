@@ -22,6 +22,7 @@ typedef enum {
 typedef struct RequestHeader RequestHeader;
 struct RequestHeader {
     RequestMethod method;
+    String path;
     String user_agent;
     size_t content_length;
 };
@@ -98,6 +99,8 @@ static Result parseRequestHeader(RequestHeader* o_ret, String header) {
             String value_copy = {0};
             CATCH(stringDuplicate(&value_copy, value, &temp_allocator), "Could not allocate null-terminated string for content length");
             ret.content_length = strtoull(value_copy.data, NULL, 10);
+        } else if(stringCompare(key, STRING_LITERAL("User-Agent")) == 0) {
+            ret.user_agent = stringTrim(value);
         }
     }
 
