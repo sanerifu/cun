@@ -41,6 +41,10 @@ static Result stringAppend(StringBuilder* io_self, String string, Arena* allocat
 static Result stringBuild(String* o_ret, StringBuilder const* i_self, Arena* allocator) {
     Result result = SUCCESS;
     StringBuilder self = *i_self;
+    if(self == NULL) {
+        *o_ret = LSTRING(NULL, 0);
+        return SUCCESS;
+    }
     String ret = LSTRING(NULL, self->total_length);
     CATCH(arenaAllocate(&ret.data, allocator, ret.length + 1), "Could not build string of length %zu\n", ret.length);
     ret.data[ret.length] = '\0';

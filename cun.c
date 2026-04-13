@@ -33,13 +33,20 @@ static int requestHandler(void* socket_ptr) {
 
     String header = {0};
     String body = {0};
-
+    
     RequestHeader parsed_header = {0};
+    
+    {
+        StringBuilder body_builder = NULL;
+        Arena CLEAN(arenaDestroy) temp_allocator = NULL;
+        CATCH(readRequestHeader(&header, &body_builder, socket, &allocator, &temp_allocator), "Could not read request header\n");
+        CATCH(parseRequestHeader(&parsed_header, header), "Could not parse request header\n");
+        CATCH(readRequestBody(&body, &body_builder, socket, &parsed_header, &allocator, &temp_allocator), "Could not read request body\n");
+    }
 
-    CATCH(readRequest(&header, &body, socket, &allocator), "Could not read request\n");
-    CATCH(parseRequestHeader(&parsed_header, header), "Could not parse header\n");
-
-    printf("Header \"%.*s\"\nBody \"%.*s\"\n", FORMAT(header), FORMAT(body));
+    printf("Method %d\n", parsed_header.method);
+    printf("Content length: %zu\n", parsed_header.content_length);
+    printf("Body \"%.*s\"\n", FORMAT(body));
 
     send(
         socket,
