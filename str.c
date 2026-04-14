@@ -101,7 +101,24 @@ static Result stringFormat(String* o_ret, Arena* allocator, char const* fmt, ...
     va_start(ap, fmt);
     ret.length = length;
     vsnprintf(ret.data, ret.length + 1, fmt, ap);
+    ret.data[ret.length] = '\0';
     va_end(ap);
+
+    *o_ret = ret;
+    return SUCCESS;
+}
+
+static Result stringFromFile(String* o_ret, Arena* allocator, FILE* fp) {
+    Result result;
+    String ret;
+
+    fseek(fp, 0, SEEK_END);
+    ret.length = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    arenaAllocate(&ret.data, allocator, ret.length + 1);
+
+    fread(ret.data, sizeof(char), ret.length, fp);
+    ret.data[ret.length] = '\0';
 
     *o_ret = ret;
     return SUCCESS;
