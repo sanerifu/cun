@@ -11,10 +11,18 @@
 #include <sys/socket.h>
 #include <threads.h>
 #include <unistd.h>
+#include <lua5.1/lua.h>
+#include <lua5.1/lauxlib.h>
 
 #include "arena.c"
 #include "request.c"
 #include "result.c"
+
+extern void luaL_openlibs(lua_State* L); // my headers don't have this for some reason
+
+static void lua_closeWrapper(void* data) {
+    lua_close(*(lua_State**)data);
+}
 
 static int requestHandler(void* socket_ptr) {
     void* CLEAN(free) _socket_ptr_copy = socket_ptr;
@@ -25,24 +33,54 @@ static int requestHandler(void* socket_ptr) {
 
     String header = {0};
     String body = {0};
-    
+
     RequestHeader parsed_header = {0};
-    
+
     {
         StringBuilder body_builder = NULL;
         Arena CLEAN(arenaDestroy) temp_allocator = NULL;
-        CATCH(readRequestHeader(&header, &body_builder, socket, &allocator, &temp_allocator), "Could not read request header\n");
+        CATCH(
+            readRequestHeader(&header, &body_builder, socket, &allocator, &temp_allocator),
+            "Could not read request header\n"
+        );
         CATCH(parseRequestHeader(&parsed_header, header), "Could not parse request header\n");
-        CATCH(readRequestBody(&body, &body_builder, socket, &parsed_header, &allocator, &temp_allocator), "Could not read request body\n");
+        CATCH(
+            readRequestBody(&body, &body_builder, socket, &parsed_header, &allocator, &temp_allocator),
+            "Could not read request body\n"
+        );
     }
 
     String formatted;
-    CATCH(stringFormat(&formatted, &allocator, "Method %d\n", parsed_header.method), "OOM"); printf("%.*s", FORMAT(formatted));
-    CATCH(stringFormat(&formatted, &allocator, "Path \"%.*s\"\n", FORMAT(parsed_header.path)), "OOM"); printf("%.*s", FORMAT(formatted));
-    CATCH(stringFormat(&formatted, &allocator, "Version %04x\n", parsed_header.version), "OOM"); printf("%.*s", FORMAT(formatted));
-    CATCH(stringFormat(&formatted, &allocator, "User agent \"%.*s\"\n", FORMAT(parsed_header.user_agent)), "OOM"); printf("%.*s", FORMAT(formatted));
-    CATCH(stringFormat(&formatted, &allocator, "Content length %zu\n", parsed_header.content_length), "OOM"); printf("%.*s", FORMAT(formatted));
-    CATCH(stringFormat(&formatted, &allocator, "Body \"%.*s\"\n", FORMAT(body)), "OOM"); printf("%.*s", FORMAT(formatted));
+    CATCH(stringFormat(&formatted, &allocator, "Method %d\n", parsed_header.method), "OOM\n");
+    printf("%.*s", FORMAT(formatted));
+    CATCH(stringFormat(&formatted, &allocator, "Path \"%.*s\"\n", FORMAT(parsed_header.path)), "OOM\n");
+    printf("%.*s", FORMAT(formatted));
+    CATCH(stringFormat(&formatted, &allocator, "Version %04x\n", parsed_header.version), "OOM\n");
+    printf("%.*s", FORMAT(formatted));
+    CATCH(stringFormat(&formatted, &allocator, "User agent \"%.*s\"\n", FORMAT(parsed_header.user_agent)), "OOM\n");
+    printf("%.*s", FORMAT(formatted));
+    CATCH(stringFormat(&formatted, &allocator, "Content length %zu\n", parsed_header.content_length), "OOM\n");
+    printf("%.*s", FORMAT(formatted));
+    CATCH(stringFormat(&formatted, &allocator, "Body \"%.*s\"\n", FORMAT(body)), "OOM\n");
+    printf("%.*s", FORMAT(formatted));
+
+    String lua_content_path;
+    CATCH(
+        stringFormat(&lua_content_path, &allocator, ".%.*s.lua", FORMAT(parsed_header.path)),
+        "Could not create path"
+    );
+
+    FILE* CLEAN(fclose) fp = NULL;
+    String lua_data = LSTRING(NULL, 0);
+
+    if ((fp = fopen(lua_content_path.data, "rb"))) {
+        CATCH(stringFromFile(&lua_data, &allocator, fp), "Could not read from file\n");
+    }
+
+    lua_State* CLEAN(lua_close) L = luaL_newstate();
+    luaL_openlibs(L);
+    
+    luaL_dostring(L, lua_data.data);
 
     shutdown(socket, SHUT_RDWR);
 
