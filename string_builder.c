@@ -1,11 +1,14 @@
 #ifndef __STRING_BUILDER_C__
 #define __STRING_BUILDER_C__
 
+#include <stdarg.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "arena.c"
+#include "common.c"
 #include "result.c"
 #include "str.c"
 
@@ -38,10 +41,35 @@ static Result stringAppend(StringBuilder* io_self, String string, Arena* allocat
     return SUCCESS;
 }
 
+static Result stringAppendf(StringBuilder* io_self, Arena* allocator, char const* fmt, ...) {
+    Result result;
+
+    va_list ap;
+    va_start(ap, fmt);
+    size_t length = vsnprintf(NULL, 0, fmt, ap);
+    va_end(ap);
+
+    va_start(ap, fmt);
+    StringBuilder self = *io_self;
+    size_t previous_total_length = self == NULL ? 0 : self->total_length;
+    StringBuilder next = NULL;
+    CATCH(arenaAllocate(&next, allocator, sizeof(struct StringBuilder) + length), "Could not append format\n");
+
+    next->prev = self;
+    next->length = length;
+    next->total_length = previous_total_length + next->length;
+    vsnprintf(next->data, length + 1, fmt, ap);
+    va_end(ap);
+
+    self = next;
+    *io_self = self;
+    return SUCCESS;
+}
+
 static Result stringBuild(String* o_ret, StringBuilder const* i_self, Arena* allocator) {
     Result result = SUCCESS;
     StringBuilder self = *i_self;
-    if(self == NULL) {
+    if (self == NULL) {
         *o_ret = LSTRING(NULL, 0);
         return SUCCESS;
     }

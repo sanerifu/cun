@@ -3,6 +3,7 @@
 
 #include <ctype.h>
 #include <iso646.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
@@ -83,6 +84,25 @@ static Result stringDuplicate(String* o_ret, String string, Arena* allocator) {
     memcpy(ret.data, string.data, string.length);
     ret.length = string.length;
     ret.data[ret.length] = '\0';
+    *o_ret = ret;
+    return SUCCESS;
+}
+
+static Result stringFormat(String* o_ret, Arena* allocator, char const* fmt, ...) {
+    Result result;
+    va_list ap;
+    va_start(ap, fmt);
+    size_t length = vsnprintf(NULL, 0, fmt, ap);
+    va_end(ap);
+
+    String ret;
+    CATCH(arenaAllocate(&ret.data, allocator, length + 1), "Could not allocate formatted string\n");
+    
+    va_start(ap, fmt);
+    ret.length = length;
+    vsnprintf(ret.data, ret.length + 1, fmt, ap);
+    va_end(ap);
+
     *o_ret = ret;
     return SUCCESS;
 }

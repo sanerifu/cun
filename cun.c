@@ -16,14 +16,6 @@
 #include "request.c"
 #include "result.c"
 
-static void freeWrapper(void* data) {
-    free(*(void**)data);
-}
-
-static void closeWrapper(void* data) {
-    close(*(int*)data);
-}
-
 static int requestHandler(void* socket_ptr) {
     void* CLEAN(free) _socket_ptr_copy = socket_ptr;
 
@@ -44,19 +36,16 @@ static int requestHandler(void* socket_ptr) {
         CATCH(readRequestBody(&body, &body_builder, socket, &parsed_header, &allocator, &temp_allocator), "Could not read request body\n");
     }
 
-    printf("Method %d\n", parsed_header.method);
-    printf("Path \"%.*s\"\n", FORMAT(parsed_header.path));
-    printf("Version %04x\n", parsed_header.version);
-    printf("User agent \"%.*s\"\n", FORMAT(parsed_header.user_agent));
-    printf("Content length: %zu\n", parsed_header.content_length);
-    printf("Body \"%.*s\"\n", FORMAT(body));
+    String formatted;
+    CATCH(stringFormat(&formatted, &allocator, "Method %d\n", parsed_header.method), "OOM"); printf("%.*s", FORMAT(formatted));
+    CATCH(stringFormat(&formatted, &allocator, "Path \"%.*s\"\n", FORMAT(parsed_header.path)), "OOM"); printf("%.*s", FORMAT(formatted));
+    CATCH(stringFormat(&formatted, &allocator, "Version %04x\n", parsed_header.version), "OOM"); printf("%.*s", FORMAT(formatted));
+    CATCH(stringFormat(&formatted, &allocator, "User agent \"%.*s\"\n", FORMAT(parsed_header.user_agent)), "OOM"); printf("%.*s", FORMAT(formatted));
+    CATCH(stringFormat(&formatted, &allocator, "Content length %zu\n", parsed_header.content_length), "OOM"); printf("%.*s", FORMAT(formatted));
+    CATCH(stringFormat(&formatted, &allocator, "Body \"%.*s\"\n", FORMAT(body)), "OOM"); printf("%.*s", FORMAT(formatted));
 
-    send(
-        socket,
-        "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 14\r\n\r\nHello, World!\n",
-        sizeof("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 14\r\n\r\nHello, World!\n") - 1,
-        0
-    );
+    shutdown(socket, SHUT_RDWR);
+
     return SUCCESS;
 }
 
