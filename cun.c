@@ -2,6 +2,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <iso646.h>
+#include <lua5.1/lauxlib.h>
+#include <lua5.1/lua.h>
 #include <netinet/in.h>
 #include <readline/readline.h>
 #include <stdbool.h>
@@ -11,14 +13,12 @@
 #include <sys/socket.h>
 #include <threads.h>
 #include <unistd.h>
-#include <lua5.1/lua.h>
-#include <lua5.1/lauxlib.h>
 
 #include "arena.c"
 #include "request.c"
 #include "result.c"
 
-extern void luaL_openlibs(lua_State* L); // my headers don't have this for some reason
+extern void luaL_openlibs(lua_State* L);  // my headers don't have this for some reason
 
 static void lua_closeWrapper(void* data) {
     lua_close(*(lua_State**)data);
@@ -42,7 +42,7 @@ static char const* requestMethodToString(RequestMethod method) {
 }
 
 static char const* responsePhrase(int code) {
-    switch(code) {
+    switch (code) {
         case 200:
             return "OK";
         case 404:
@@ -105,57 +105,88 @@ static int requestHandler(void* socket_ptr) {
         CATCH(stringFromFile(&lua_data, &allocator, fp), "Could not read from file\n");
     }
 
-    lua_State* CLEAN(lua_close) L = luaL_newstate();
-    luaL_openlibs(L);
+    if (fp != NULL) {
+        lua_State* CLEAN(lua_close) L = luaL_newstate();
+        luaL_openlibs(L);
 
-    lua_newtable(L);
+        lua_newtable(L);
 
-    lua_pushstring(L, requestMethodToString(parsed_header.method));
-    lua_setfield(L, -2, "method");
+        lua_pushstring(L, requestMethodToString(parsed_header.method));
+        lua_setfield(L, -2, "method");
 
-    lua_pushlstring(L, parsed_header.path.data, parsed_header.path.length);
-    lua_setfield(L, -2, "path");
+        lua_pushlstring(L, parsed_header.path.data, parsed_header.path.length);
+        lua_setfield(L, -2, "path");
 
-    lua_pushlstring(L, parsed_header.user_agent.data, parsed_header.user_agent.length);
-    lua_setfield(L, -2, "user_agent");
+        lua_pushlstring(L, parsed_header.user_agent.data, parsed_header.user_agent.length);
+        lua_setfield(L, -2, "user_agent");
 
-    lua_pushlstring(L, body.data, body.length);
-    lua_setfield(L, -2, "body");
+        lua_pushlstring(L, body.data, body.length);
+        lua_setfield(L, -2, "body");
 
-    lua_setglobal(L, "request");
-    
-    luaL_dostring(L, lua_data.data);
+        lua_setglobal(L, "request");
 
-    lua_getfield(L, -1, "status");
-    int status_code = luaL_optint(L, -1, 200);
-    lua_pop(L, 1);
+        luaL_dostring(L, lua_data.data);
 
-    lua_getfield(L, -1, "content_type");
-    char const* content_type = luaL_optstring(L, -1, "text/html");
-    lua_pop(L, 1);
+        lua_getfield(L, -1, "status");
+        int status_code = luaL_optint(L, -1, 200);
+        lua_pop(L, 1);
 
-    String response_body;
-    lua_getfield(L, -1, "body");
-    response_body.data = (char*)luaL_optlstring(L, -1, "", &response_body.length);
-    lua_pop(L, 1);
+        lua_getfield(L, -1, "content_type");
+        char const* content_type = luaL_optstring(L, -1, "text/html");
+        lua_pop(L, 1);
 
-    CATCH(stringFormat(
-        &formatted,
-        &allocator,
-        "HTTP/1.1 %3d %s\r\n"
-        "Content-Length: %d\r\n"
-        "Content-Type: %s\r\n"
-        "\r\n"
-        "%s"
-        ,
-        status_code, responsePhrase(status_code),
-        response_body.length,
-        content_type,
+        String response_body;
+        lua_getfield(L, -1, "body");
+        response_body.data = (char*)luaL_optlstring(L, -1, "", &response_body.length);
+        lua_pop(L, 1);
 
-        response_body.data
-    ), "Could not allocate formatted string");
+        CATCH(
+            stringFormat(
+                &formatted,
+                &allocator,
+                "HTTP/1.1 %3d %s\r\n"
+                "Content-Length: %d\r\n"
+                "Content-Type: %s\r\n"
+                "\r\n"
+                "%s",
+                status_code,
+                responsePhrase(status_code),
+                response_body.length,
+                content_type,
 
-    send(socket, formatted.data, formatted.length, 0);
+                response_body.data
+            ),
+            "Could not allocate formatted string"
+        );
+
+        send(socket, formatted.data, formatted.length, 0);
+    } else {
+        char error_page[] =
+            "<!DOCTYPE html>\n"
+            "<html>\n"
+            "<head>\n"
+            "   <meta charset=\"utf-8\" />\n"
+            "   <title>Page not found</title>\n"
+            "</head>\n"
+            "<body>\n"
+            "   <h1>Requested page not found</h1>\n"
+            "</body>\n"
+            "</html>\n"
+        ;
+        CATCH(stringFormat(
+            &formatted,
+            &allocator, 
+            "HTTP/1.1 404 Not Found\r\n"
+            "Content-Length: %zu\r\n"
+            "Content-Type: text/html\r\n"
+            "\r\n"
+            "%s",
+
+            sizeof(error_page) - 1,
+            error_page
+        ), "Could not allocate formatted string");
+        send(socket, formatted.data, formatted.length, 0);
+    }
 
     shutdown(socket, SHUT_RDWR);
 

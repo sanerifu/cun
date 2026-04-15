@@ -14,7 +14,10 @@ static void closeWrapper(void* data) {
 }
 
 static void fcloseWrapper(void* data) {
-    fclose(*(FILE**)data);
+    FILE* fp = *(FILE**)data;
+    if(fp != NULL) {
+        fclose(fp);
+    }
 }
 
 #define CLEAN(f) __attribute__((cleanup(f##Wrapper)))
