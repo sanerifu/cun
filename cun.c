@@ -41,6 +41,17 @@ static char const* requestMethodToString(RequestMethod method) {
     }
 }
 
+static char const* responsePhrase(int code) {
+    switch(code) {
+        case 200:
+            return "OK";
+        case 404:
+            return "Not Found";
+        default:
+            return "CODE";
+    }
+}
+
 static int requestHandler(void* socket_ptr) {
     void* CLEAN(free) _socket_ptr_copy = socket_ptr;
 
@@ -114,6 +125,37 @@ static int requestHandler(void* socket_ptr) {
     lua_setglobal(L, "request");
     
     luaL_dostring(L, lua_data.data);
+
+    lua_getfield(L, -1, "status");
+    int status_code = luaL_optint(L, -1, 200);
+    lua_pop(L, 1);
+
+    lua_getfield(L, -1, "content_type");
+    char const* content_type = luaL_optstring(L, -1, "text/html");
+    lua_pop(L, 1);
+
+    String response_body;
+    lua_getfield(L, -1, "body");
+    response_body.data = (char*)luaL_optlstring(L, -1, "", &response_body.length);
+    lua_pop(L, 1);
+
+    CATCH(stringFormat(
+        &formatted,
+        &allocator,
+        "HTTP/1.1 %3d %s\r\n"
+        "Content-Length: %d\r\n"
+        "Content-Type: %s\r\n"
+        "\r\n"
+        "%s"
+        ,
+        status_code, responsePhrase(status_code),
+        response_body.length,
+        content_type,
+
+        response_body.data
+    ), "Could not allocate formatted string");
+
+    send(socket, formatted.data, formatted.length, 0);
 
     shutdown(socket, SHUT_RDWR);
 
