@@ -24,6 +24,23 @@ static void lua_closeWrapper(void* data) {
     lua_close(*(lua_State**)data);
 }
 
+static char const* requestMethodToString(RequestMethod method) {
+    switch (method) {
+        case GET_REQUEST:
+            return "get";
+        case POST_REQUEST:
+            return "post";
+        case HEAD_REQUEST:
+            return "head";
+        case PUT_REQUEST:
+            return "put";
+        case PATCH_REQUEST:
+            return "patch";
+        case DELETE_REQUEST:
+            return "delete";
+    }
+}
+
 static int requestHandler(void* socket_ptr) {
     void* CLEAN(free) _socket_ptr_copy = socket_ptr;
 
@@ -51,18 +68,18 @@ static int requestHandler(void* socket_ptr) {
     }
 
     String formatted;
-    CATCH(stringFormat(&formatted, &allocator, "Method %d\n", parsed_header.method), "OOM\n");
-    printf("%.*s", FORMAT(formatted));
-    CATCH(stringFormat(&formatted, &allocator, "Path \"%.*s\"\n", FORMAT(parsed_header.path)), "OOM\n");
-    printf("%.*s", FORMAT(formatted));
-    CATCH(stringFormat(&formatted, &allocator, "Version %04x\n", parsed_header.version), "OOM\n");
-    printf("%.*s", FORMAT(formatted));
-    CATCH(stringFormat(&formatted, &allocator, "User agent \"%.*s\"\n", FORMAT(parsed_header.user_agent)), "OOM\n");
-    printf("%.*s", FORMAT(formatted));
-    CATCH(stringFormat(&formatted, &allocator, "Content length %zu\n", parsed_header.content_length), "OOM\n");
-    printf("%.*s", FORMAT(formatted));
-    CATCH(stringFormat(&formatted, &allocator, "Body \"%.*s\"\n", FORMAT(body)), "OOM\n");
-    printf("%.*s", FORMAT(formatted));
+    // CATCH(stringFormat(&formatted, &allocator, "Method %d\n", parsed_header.method), "OOM\n");
+    // printf("%.*s", FORMAT(formatted));
+    // CATCH(stringFormat(&formatted, &allocator, "Path \"%.*s\"\n", FORMAT(parsed_header.path)), "OOM\n");
+    // printf("%.*s", FORMAT(formatted));
+    // CATCH(stringFormat(&formatted, &allocator, "Version %04x\n", parsed_header.version), "OOM\n");
+    // printf("%.*s", FORMAT(formatted));
+    // CATCH(stringFormat(&formatted, &allocator, "User agent \"%.*s\"\n", FORMAT(parsed_header.user_agent)), "OOM\n");
+    // printf("%.*s", FORMAT(formatted));
+    // CATCH(stringFormat(&formatted, &allocator, "Content length %zu\n", parsed_header.content_length), "OOM\n");
+    // printf("%.*s", FORMAT(formatted));
+    // CATCH(stringFormat(&formatted, &allocator, "Body \"%.*s\"\n", FORMAT(body)), "OOM\n");
+    // printf("%.*s", FORMAT(formatted));
 
     String lua_content_path;
     CATCH(
@@ -79,6 +96,22 @@ static int requestHandler(void* socket_ptr) {
 
     lua_State* CLEAN(lua_close) L = luaL_newstate();
     luaL_openlibs(L);
+
+    lua_newtable(L);
+
+    lua_pushstring(L, requestMethodToString(parsed_header.method));
+    lua_setfield(L, -2, "method");
+
+    lua_pushlstring(L, parsed_header.path.data, parsed_header.path.length);
+    lua_setfield(L, -2, "path");
+
+    lua_pushlstring(L, parsed_header.user_agent.data, parsed_header.user_agent.length);
+    lua_setfield(L, -2, "user_agent");
+
+    lua_pushlstring(L, body.data, body.length);
+    lua_setfield(L, -2, "body");
+
+    lua_setglobal(L, "request");
     
     luaL_dostring(L, lua_data.data);
 

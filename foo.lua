@@ -1,3 +1,3 @@
-local x = 5
-
-print(x)
+for k,v in pairs(request) do
+    print(("%q: %q"):format(k, v))
+end
