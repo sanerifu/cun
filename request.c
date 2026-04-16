@@ -44,7 +44,7 @@ static Result readRequestHeader(
     Arena* temp_allocator
 ) {
     Result result = SUCCESS;
-    StringBuilder header_builder = NULL;
+    StringBuilder header_builder = {0};
     size_t initial_body_length = 0;
     {
         char buf[BUFSIZ];
@@ -81,11 +81,11 @@ static Result readRequestHeader(
     return SUCCESS;
 }
 
-static Result parseRequestHeader(RequestHeader* o_ret, String header) {
+static Result parseRequestHeader(RequestHeader* o_ret, String header, Arena* allocator) {
     Result result = SUCCESS;
     String line = {0};
     RequestHeader ret = {0};
-    Arena CLEAN(arenaDestroy) temp_allocator = NULL;
+    Arena CLEAN(arenaDestroy) temp_allocator = {0};
 
     String http_start = stringSplit(&header, STRING_LITERAL("\r\n"));
     String method = stringSplit(&http_start, STRING_LITERAL(" "));

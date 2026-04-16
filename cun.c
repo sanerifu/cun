@@ -55,7 +55,7 @@ static char const* responsePhrase(int code) {
 static int requestHandler(void* socket_ptr) {
     void* CLEAN(free) _socket_ptr_copy = socket_ptr;
 
-    Arena allocator = NULL;
+    Arena allocator = {0};
     Result result = SUCCESS;
     int socket = *(int*)socket_ptr;
 
@@ -65,13 +65,13 @@ static int requestHandler(void* socket_ptr) {
     RequestHeader parsed_header = {0};
 
     {
-        StringBuilder body_builder = NULL;
-        Arena CLEAN(arenaDestroy) temp_allocator = NULL;
+        StringBuilder body_builder = {0};
+        Arena CLEAN(arenaDestroy) temp_allocator = {0};
         CATCH(
             readRequestHeader(&header, &body_builder, socket, &allocator, &temp_allocator),
             "Could not read request header\n"
         );
-        CATCH(parseRequestHeader(&parsed_header, header), "Could not parse request header\n");
+        CATCH(parseRequestHeader(&parsed_header, header, &allocator), "Could not parse request header\n");
         CATCH(
             readRequestBody(&body, &body_builder, socket, &parsed_header, &allocator, &temp_allocator),
             "Could not read request body\n"
