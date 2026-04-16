@@ -11,7 +11,8 @@ typedef enum {
     RECEIVE_ERROR,
     SEND_ERROR,
     UNRECOGNIZED_HTTP_METHOD,
-    UNSUPPORTED_HTTP_VERSION
+    UNSUPPORTED_HTTP_VERSION,
+    INVALID_PERCENT_ENCODING
 } Result;
 
 #define CATCH(expr, ...)                \

@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "arena.c"
 #include "result.c"
@@ -119,6 +120,49 @@ static Result stringFromFile(String* o_ret, Arena* allocator, FILE* fp) {
 
     fread(ret.data, sizeof(char), ret.length, fp);
     ret.data[ret.length] = '\0';
+
+    *o_ret = ret;
+    return SUCCESS;
+}
+
+static uint8_t hex2nibble(char digit) {
+    if('0' <= digit and digit <= '9') {
+        return digit - '0';
+    } else if('A' <= digit and digit <= 'F') {
+        return digit - 'A';
+    } else {
+        return digit - 'a';
+    }
+}
+
+static uint8_t hex2byte(char upper, char lower) {
+    return (hex2nibble(upper) << 4) | (hex2nibble(lower));
+}
+
+static Result stringUrlDecode(String* o_ret, String string, Arena* allocator) {
+    Result result;
+    String ret;
+    CATCH(arenaAllocate(&ret.data, allocator, string.length), "Could not allocate decoded string\n");
+    ret.length = 0;
+
+    for(size_t i = 0; i < string.length; i++) {
+        if(string.data[i] == '%') {
+            if(i > string.length - 3 || !isxdigit(string.data[i + 1]) || !isxdigit(string.data[i + 2])) {
+                fprintf(stderr, "Invalid percent encoding in \"%.*s\" at index %zu\n", FORMAT(string), i);
+                return INVALID_PERCENT_ENCODING;
+            }
+            char c = (char)hex2byte(string.data[i + 1], string.data[i + 2]);
+            ret.data[ret.length] = c;
+            ret.length += 1;
+            i += 2;
+        } else if(string.data[i] == '+') {
+            ret.data[ret.length] = ' ';
+            ret.length += 1;
+        } else {
+            ret.data[ret.length] = string.data[i];
+            ret.length += 1;
+        }
+    }
 
     *o_ret = ret;
     return SUCCESS;
