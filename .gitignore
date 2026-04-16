@@ -2,3 +2,4 @@ cun
 .vscode/
 build.sh
 inspect.lua
+*.txt

@@ -2,6 +2,10 @@ local inspect = require('inspect')
 
 print(inspect.inspect(request))
 
+local logs = assert(io.open("logs.txt", "a"))
+logs:write(("[%s] I connected with %s\n"):format(os.date("!%Y-%m-%d %H:%M:%S"), request.ip))
+logs:close()
+
 return {
     status = 200,
     content_type = "text/html",
@@ -18,3 +22,4 @@ return {
         </html>
     ]]):format(request.queries.name or "stranger")
 }
+
