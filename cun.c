@@ -112,6 +112,20 @@ static int requestHandler(void* socket_ptr) {
             lua_pushlstring(L, body.data, body.length);
             lua_setfield(L, -2, "body");
 
+            {
+                lua_newtable(L);
+                String queries = parsed_header.queries;
+                String query;
+                while((query = stringSplit(&queries, STRING_LITERAL(";"))).data) {
+                    String key = stringSplit(&query, STRING_LITERAL("="));
+                    String value = query;
+                    lua_pushlstring(L, key.data, key.length);
+                    lua_pushlstring(L, value.data, value.length);
+                    lua_rawset(L, -3);
+                }
+                lua_setfield(L, -2, "queries");
+            }
+
             lua_setglobal(L, "request");
         }
 

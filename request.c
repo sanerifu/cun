@@ -31,6 +31,7 @@ struct RequestHeader {
     String path;
     HttpVersion version;
 
+    String queries;
     String user_agent;
     size_t content_length;
 };
@@ -104,7 +105,8 @@ static Result parseRequestHeader(RequestHeader* o_ret, String header) {
         fprintf(stderr, "Unrecognized HTTP method: \"%.*s\"\n", FORMAT(method));
         return UNRECOGNIZED_HTTP_METHOD;
     }
-    ret.path = stringSplit(&http_start, STRING_LITERAL(" "));
+    ret.queries = stringSplit(&http_start, STRING_LITERAL(" "));
+    ret.path = stringSplit(&ret.queries, STRING_LITERAL("?"));
     String http_version = stringSplit(&http_start, STRING_LITERAL(" "));
     if(stringCompare(http_version, STRING_LITERAL("HTTP/1.1")) == 0) {
         ret.version = HTTP_1_1;

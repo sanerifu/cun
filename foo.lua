@@ -1,9 +1,9 @@
-for k,v in pairs(request) do
-    print(("%q: %q"):format(k, v))
-end
+local inspect = require('inspect')
+
+print(inspect.inspect(request))
 
 return {
     status = 200,
     content_type = "text/plain",
-    body = "Hello, Internet!\n"
+    body = ("Hello, %s!\n"):format(request.queries.name or "stranger")
 }
