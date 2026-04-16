@@ -52,12 +52,21 @@ static char const* responsePhrase(int code) {
     }
 }
 
-static int requestHandler(void* socket_ptr) {
-    void* CLEAN(free) _socket_ptr_copy = socket_ptr;
+typedef struct RequestHandlerInput RequestHandlerInput;
+struct RequestHandlerInput {
+    int socket;
+    char ip[16];
+};
+
+static int requestHandler(void* input_ptr) {
+    void* CLEAN(free) _socket_ptr_copy = input_ptr;
+
+    RequestHandlerInput input = *(RequestHandlerInput*)input_ptr;
 
     Arena allocator = {0};
     Result result = SUCCESS;
-    int socket = *(int*)socket_ptr;
+    int socket = input.socket;
+    String ip = ZSTRING(input.ip);
 
     String header = {0};
     String body = {0};
@@ -99,6 +108,9 @@ static int requestHandler(void* socket_ptr) {
 
         {
             lua_newtable(L);
+
+            lua_pushlstring(L, ip.data, ip.length);
+            lua_setfield(L, -2, "ip");
 
             lua_pushstring(L, requestMethodToString(parsed_header.method));
             lua_setfield(L, -2, "method");
@@ -226,9 +238,10 @@ static int serverLoop(void* sock) {
         printf("Connected to %s\n", ip);
 
         thrd_t thread;
-        int* socket_ptr = malloc(sizeof(int));
-        *socket_ptr = client_socket;
-        thrd_create(&thread, &requestHandler, socket_ptr);
+        RequestHandlerInput* input = malloc(sizeof(*input));
+        input->socket = client_socket;
+        memcpy(input->ip, ip, sizeof(ip));
+        thrd_create(&thread, &requestHandler, input);
     }
 
     close(server_socket);
