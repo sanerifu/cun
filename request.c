@@ -106,7 +106,9 @@ static Result parseRequestHeader(RequestHeader* o_ret, String header, Arena* all
         return UNRECOGNIZED_HTTP_METHOD;
     }
     ret.queries = stringSplit(&http_start, STRING_LITERAL(" "));
-    ret.path = stringSplit(&ret.queries, STRING_LITERAL("?"));
+    String path = stringSplit(&ret.queries, STRING_LITERAL("?"));
+    CATCH(stringUrlDecode(&ret.path, path, allocator), "Could not decode URL string");
+
     String http_version = stringSplit(&http_start, STRING_LITERAL(" "));
     if(stringCompare(http_version, STRING_LITERAL("HTTP/1.1")) == 0) {
         ret.version = HTTP_1_1;
