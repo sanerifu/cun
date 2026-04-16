@@ -79,18 +79,6 @@ static int requestHandler(void* socket_ptr) {
     }
 
     String formatted;
-    // CATCH(stringFormat(&formatted, &allocator, "Method %d\n", parsed_header.method), "OOM\n");
-    // printf("%.*s", FORMAT(formatted));
-    // CATCH(stringFormat(&formatted, &allocator, "Path \"%.*s\"\n", FORMAT(parsed_header.path)), "OOM\n");
-    // printf("%.*s", FORMAT(formatted));
-    // CATCH(stringFormat(&formatted, &allocator, "Version %04x\n", parsed_header.version), "OOM\n");
-    // printf("%.*s", FORMAT(formatted));
-    // CATCH(stringFormat(&formatted, &allocator, "User agent \"%.*s\"\n", FORMAT(parsed_header.user_agent)), "OOM\n");
-    // printf("%.*s", FORMAT(formatted));
-    // CATCH(stringFormat(&formatted, &allocator, "Content length %zu\n", parsed_header.content_length), "OOM\n");
-    // printf("%.*s", FORMAT(formatted));
-    // CATCH(stringFormat(&formatted, &allocator, "Body \"%.*s\"\n", FORMAT(body)), "OOM\n");
-    // printf("%.*s", FORMAT(formatted));
 
     String lua_content_path;
     CATCH(
@@ -109,55 +97,59 @@ static int requestHandler(void* socket_ptr) {
         lua_State* CLEAN(lua_close) L = luaL_newstate();
         luaL_openlibs(L);
 
-        lua_newtable(L);
+        {
+            lua_newtable(L);
 
-        lua_pushstring(L, requestMethodToString(parsed_header.method));
-        lua_setfield(L, -2, "method");
+            lua_pushstring(L, requestMethodToString(parsed_header.method));
+            lua_setfield(L, -2, "method");
 
-        lua_pushlstring(L, parsed_header.path.data, parsed_header.path.length);
-        lua_setfield(L, -2, "path");
+            lua_pushlstring(L, parsed_header.path.data, parsed_header.path.length);
+            lua_setfield(L, -2, "path");
 
-        lua_pushlstring(L, parsed_header.user_agent.data, parsed_header.user_agent.length);
-        lua_setfield(L, -2, "user_agent");
+            lua_pushlstring(L, parsed_header.user_agent.data, parsed_header.user_agent.length);
+            lua_setfield(L, -2, "user_agent");
 
-        lua_pushlstring(L, body.data, body.length);
-        lua_setfield(L, -2, "body");
+            lua_pushlstring(L, body.data, body.length);
+            lua_setfield(L, -2, "body");
 
-        lua_setglobal(L, "request");
+            lua_setglobal(L, "request");
+        }
 
         luaL_dostring(L, lua_data.data);
 
-        lua_getfield(L, -1, "status");
-        int status_code = luaL_optint(L, -1, 200);
-        lua_pop(L, 1);
+        {
+            lua_getfield(L, -1, "status");
+            int status_code = luaL_optint(L, -1, 200);
+            lua_pop(L, 1);
 
-        lua_getfield(L, -1, "content_type");
-        char const* content_type = luaL_optstring(L, -1, "text/html");
-        lua_pop(L, 1);
+            lua_getfield(L, -1, "content_type");
+            char const* content_type = luaL_optstring(L, -1, "text/html");
+            lua_pop(L, 1);
 
-        String response_body;
-        lua_getfield(L, -1, "body");
-        response_body.data = (char*)luaL_optlstring(L, -1, "", &response_body.length);
-        lua_pop(L, 1);
+            String response_body;
+            lua_getfield(L, -1, "body");
+            response_body.data = (char*)luaL_optlstring(L, -1, "", &response_body.length);
+            lua_pop(L, 1);
 
-        CATCH(
-            stringFormat(
-                &formatted,
-                &allocator,
-                "HTTP/1.1 %3d %s\r\n"
-                "Content-Length: %d\r\n"
-                "Content-Type: %s\r\n"
-                "\r\n"
-                "%s",
-                status_code,
-                responsePhrase(status_code),
-                response_body.length,
-                content_type,
+            CATCH(
+                stringFormat(
+                    &formatted,
+                    &allocator,
+                    "HTTP/1.1 %3d %s\r\n"
+                    "Content-Length: %d\r\n"
+                    "Content-Type: %s\r\n"
+                    "\r\n"
+                    "%s",
+                    status_code,
+                    responsePhrase(status_code),
+                    response_body.length,
+                    content_type,
 
-                response_body.data
-            ),
-            "Could not allocate formatted string"
-        );
+                    response_body.data
+                ),
+                "Could not allocate formatted string"
+            );
+        }
 
         send(socket, formatted.data, formatted.length, 0);
     } else {
@@ -171,20 +163,22 @@ static int requestHandler(void* socket_ptr) {
             "<body>\n"
             "   <h1>Requested page not found</h1>\n"
             "</body>\n"
-            "</html>\n"
-        ;
-        CATCH(stringFormat(
-            &formatted,
-            &allocator, 
-            "HTTP/1.1 404 Not Found\r\n"
-            "Content-Length: %zu\r\n"
-            "Content-Type: text/html\r\n"
-            "\r\n"
-            "%s",
+            "</html>\n";
+        CATCH(
+            stringFormat(
+                &formatted,
+                &allocator,
+                "HTTP/1.1 404 Not Found\r\n"
+                "Content-Length: %zu\r\n"
+                "Content-Type: text/html\r\n"
+                "\r\n"
+                "%s",
 
-            sizeof(error_page) - 1,
-            error_page
-        ), "Could not allocate formatted string");
+                sizeof(error_page) - 1,
+                error_page
+            ),
+            "Could not allocate formatted string"
+        );
         send(socket, formatted.data, formatted.length, 0);
     }
 
