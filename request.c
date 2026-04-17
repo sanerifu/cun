@@ -33,6 +33,7 @@ struct RequestHeader {
 
     String queries;
     String user_agent;
+    String cookies;
     size_t content_length;
 };
 
@@ -130,6 +131,8 @@ static Result parseRequestHeader(RequestHeader* o_ret, String header, Arena* all
                 "Could not allocate null-terminated string for content length"
             );
             ret.content_length = strtoull(value_copy.data, NULL, 10);
+        } else if(stringCompare(key, STRING_LITERAL("Cookie")) == 0) {
+            ret.cookies = stringTrim(value);
         } else if (stringCompare(key, STRING_LITERAL("User-Agent")) == 0) {
             ret.user_agent = stringTrim(value);
         }

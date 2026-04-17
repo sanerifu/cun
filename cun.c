@@ -140,6 +140,24 @@ static int requestHandler(void* input_ptr) {
                 lua_setfield(L, -2, "queries");
             }
 
+            {
+                lua_newtable(L);
+                String cookies = parsed_header.cookies;
+                String cookie;
+                while((cookie = stringSplit(&cookies, STRING_LITERAL(";"))).data) {
+                    String key = stringTrim(stringSplit(&cookie, STRING_LITERAL("=")));
+                    String value = stringTrim(cookie);
+                    String decoded_key;
+                    String decoded_value;
+                    CATCH(stringUrlDecode(&decoded_key, key, &allocator), "Could not decode cookie key\n");
+                    CATCH(stringUrlDecode(&decoded_value, value, &allocator), "Could not decode cookie value\n");
+                    lua_pushlstring(L, decoded_key.data, decoded_key.length);
+                    lua_pushlstring(L, decoded_value.data, decoded_value.length);
+                    lua_rawset(L, -3);
+                }
+                lua_setfield(L, -2, "cookies");
+            }
+
             lua_setglobal(L, "request");
         }
 
