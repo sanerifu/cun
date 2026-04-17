@@ -12,7 +12,7 @@ return {
     status = 200,
     content_type = "text/html",
     cookies = {
-        counter = counter + 1,
+        counter = {value = counter + 1, max_age = 2},
     },
     body = ([[
         <!DOCTYPE html>

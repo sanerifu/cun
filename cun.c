@@ -184,7 +184,23 @@ static int requestHandler(void* input_ptr) {
             Arena CLEAN(arenaDestroy) temp_allocator = {0};
             while(lua_next(L, -2) != 0) {
                 lua_pushvalue(L, -2); // prevent key from being changed by lua_to(l)string
-                stringAppendf(&cookie_builder, &temp_allocator, "Set-Cookie: %s=%s\r\n", lua_tostring(L, -1), lua_tostring(L, -2));
+                if(lua_type(L, -2) != LUA_TTABLE) {
+                    stringAppendf(&cookie_builder, &temp_allocator, "Set-Cookie: %s=%s\r\n", lua_tostring(L, -1), lua_tostring(L, -2));
+                } else {
+                    lua_getfield(L, -2, "value");
+                    String value = {0};
+                    value.data = (char*)lua_tolstring(L, -1, &value.length);
+                    lua_pop(L, 1);
+
+                    lua_getfield(L, -2, "max_age");
+                    String max_age = {0};
+                    if(lua_isnumber(L, -1)) {
+                        CATCH(stringFormat(&max_age, &temp_allocator, "; Max-Age=%d", lua_tointeger(L, -1)), "Could not set max age of cookie");
+                    }
+                    lua_pop(L, 1);
+
+                    stringAppendf(&cookie_builder, &temp_allocator, "Set-Cookie: %s=%.*s%.*s\r\n", lua_tostring(L, -1), FORMAT(value), FORMAT(max_age));
+                }
                 lua_pop(L, 2);
             }
             stringBuild(&cookies, &cookie_builder, &temp_allocator);
