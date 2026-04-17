@@ -128,7 +128,7 @@ static int requestHandler(void* input_ptr) {
                 lua_newtable(L);
                 String queries = parsed_header.queries;
                 String query;
-                while((query = stringSplit(&queries, STRING_LITERAL(";"))).data) {
+                while ((query = stringSplit(&queries, STRING_LITERAL(";"))).data) {
                     String key = stringSplit(&query, STRING_LITERAL("="));
                     String value = query;
                     String decoded_value;
@@ -144,7 +144,7 @@ static int requestHandler(void* input_ptr) {
                 lua_newtable(L);
                 String cookies = parsed_header.cookies;
                 String cookie;
-                while((cookie = stringSplit(&cookies, STRING_LITERAL(";"))).data) {
+                while ((cookie = stringSplit(&cookies, STRING_LITERAL(";"))).data) {
                     String key = stringTrim(stringSplit(&cookie, STRING_LITERAL("=")));
                     String value = stringTrim(cookie);
                     String decoded_key;
@@ -182,10 +182,16 @@ static int requestHandler(void* input_ptr) {
             lua_getfield(L, -1, "cookies");
             lua_pushnil(L);
             Arena CLEAN(arenaDestroy) temp_allocator = {0};
-            while(lua_next(L, -2) != 0) {
-                lua_pushvalue(L, -2); // prevent key from being changed by lua_to(l)string
-                if(lua_type(L, -2) != LUA_TTABLE) {
-                    stringAppendf(&cookie_builder, &temp_allocator, "Set-Cookie: %s=%s\r\n", lua_tostring(L, -1), lua_tostring(L, -2));
+            while (lua_next(L, -2) != 0) {
+                lua_pushvalue(L, -2);  // prevent key from being changed by lua_to(l)string
+                if (lua_type(L, -2) != LUA_TTABLE) {
+                    stringAppendf(
+                        &cookie_builder,
+                        &temp_allocator,
+                        "Set-Cookie: %s=%s\r\n",
+                        lua_tostring(L, -1),
+                        lua_tostring(L, -2)
+                    );
                 } else {
                     lua_getfield(L, -2, "value");
                     String value = {0};
@@ -194,12 +200,68 @@ static int requestHandler(void* input_ptr) {
 
                     lua_getfield(L, -2, "max_age");
                     String max_age = {0};
-                    if(lua_isnumber(L, -1)) {
-                        CATCH(stringFormat(&max_age, &temp_allocator, "; Max-Age=%d", lua_tointeger(L, -1)), "Could not set max age of cookie");
+                    if (lua_isnumber(L, -1)) {
+                        CATCH(
+                            stringFormat(&max_age, &temp_allocator, "; Max-Age=%d", lua_tointeger(L, -1)),
+                            "Could not set max age of cookie"
+                        );
                     }
                     lua_pop(L, 1);
 
-                    stringAppendf(&cookie_builder, &temp_allocator, "Set-Cookie: %s=%.*s%.*s\r\n", lua_tostring(L, -1), FORMAT(value), FORMAT(max_age));
+                    lua_getfield(L, -2, "http_only");
+                    String http_only = {0};
+                    if (lua_toboolean(L, -1)) {
+                        CATCH(
+                            stringFormat(&http_only, &temp_allocator, "; HttpOnly"),
+                            "Could not set cookie Http only"
+                        );
+                    }
+                    lua_pop(L, 1);
+
+                    lua_getfield(L, -2, "secure");
+                    String secure = {0};
+                    if (lua_toboolean(L, -1)) {
+                        CATCH(stringFormat(&secure, &temp_allocator, "; Secure"), "Could not set cookie secure");
+                    }
+                    lua_pop(L, 1);
+
+                    lua_getfield(L, -2, "same_site");
+                    String same_site = {0};
+                    String same_site_value = {0};
+                    if (lua_isstring(L, -1) and
+                        (same_site_value.data = (char*)lua_tolstring(L, -1, &same_site_value.length))) {
+                        char const* value = NULL;
+                        if (stringCompare(same_site_value, STRING_LITERAL("strict")) == 0) {
+                            value = "Strict";
+                        } else if (stringCompare(same_site_value, STRING_LITERAL("lax")) == 0) {
+                            value = "Lax";
+                        } else if (stringCompare(same_site_value, STRING_LITERAL("none")) == 0) {
+                            value = "None";
+                            if(secure.data == NULL) {
+                                // required
+                                CATCH(stringFormat(&secure, &temp_allocator, "; Secure"), "Could not set cookie secure");
+                            }
+                        }
+                        if (value != NULL) {
+                            CATCH(
+                                stringFormat(&same_site, &temp_allocator, "; SameSite=%s", value),
+                                "Could not set cookie's same site value"
+                            )
+                        }
+                    }
+                    lua_pop(L, 1);
+
+                    stringAppendf(
+                        &cookie_builder,
+                        &temp_allocator,
+                        "Set-Cookie: %s=%.*s%.*s%.*s%.*s%.*s\r\n",
+                        lua_tostring(L, -1),
+                        FORMAT(value),
+                        FORMAT(max_age),
+                        FORMAT(http_only),
+                        FORMAT(secure),
+                        FORMAT(same_site)
+                    );
                 }
                 lua_pop(L, 2);
             }
