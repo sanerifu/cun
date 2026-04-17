@@ -154,10 +154,22 @@ static int requestHandler(void* input_ptr) {
             char const* content_type = luaL_optstring(L, -1, "text/html");
             lua_pop(L, 1);
 
-            String response_body;
+            String response_body = {0};
             lua_getfield(L, -1, "body");
             response_body.data = (char*)luaL_optlstring(L, -1, "", &response_body.length);
             lua_pop(L, 1);
+
+            String cookies = {0};
+            StringBuilder cookie_builder = {0};
+            lua_getfield(L, -1, "cookies");
+            lua_pushnil(L);
+            Arena CLEAN(arenaDestroy) temp_allocator = {0};
+            while(lua_next(L, -2) != 0) {
+                lua_pushvalue(L, -2); // prevent key from being changed by lua_to(l)string
+                stringAppendf(&cookie_builder, &temp_allocator, "Set-Cookie: %s=%s\r\n", lua_tostring(L, -1), lua_tostring(L, -2));
+                lua_pop(L, 2);
+            }
+            stringBuild(&cookies, &cookie_builder, &temp_allocator);
 
             CATCH(
                 stringFormat(
@@ -166,14 +178,16 @@ static int requestHandler(void* input_ptr) {
                     "HTTP/1.1 %3d %s\r\n"
                     "Content-Length: %d\r\n"
                     "Content-Type: %s\r\n"
+                    "%.*s"
                     "\r\n"
-                    "%s",
+                    "%.*s",
                     status_code,
                     responsePhrase(status_code),
                     response_body.length,
                     content_type,
+                    FORMAT(cookies),
 
-                    response_body.data
+                    FORMAT(response_body)
                 ),
                 "Could not allocate formatted string"
             );

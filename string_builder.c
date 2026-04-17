@@ -53,7 +53,7 @@ static Result stringAppendf(StringBuilder* io_self, Arena* allocator, char const
     StringBuilder self = *io_self;
     size_t previous_total_length = self == NULL ? 0 : self->total_length;
     StringBuilder next = NULL;
-    CATCH(arenaAllocate(&next, allocator, sizeof(struct StringBuilder) + length), "Could not append format\n");
+    CATCH(arenaAllocate(&next, allocator, sizeof(struct StringBuilder) + length + 1), "Could not append format\n");
 
     next->prev = self;
     next->length = length;

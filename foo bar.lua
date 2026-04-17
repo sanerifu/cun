@@ -9,6 +9,10 @@ logs:close()
 return {
     status = 200,
     content_type = "text/html",
+    cookies = {
+        foo = "bar",
+        bar = "baz",
+    },
     body = ([[
         <!DOCTYPE html>
         <html>
