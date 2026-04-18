@@ -167,10 +167,10 @@ static int requestHandler(void* input_ptr) {
                 while ((query = stringSplit(&queries, STRING_LITERAL(";"))).data) {
                     String key = stringSplit(&query, STRING_LITERAL("="));
                     String value = query;
-                    String decoded_value;
-                    BUBBLE(stringUrlDecode(&decoded_value, value, &allocator), "Could not decode URL query");
+                    BUBBLE(stringUrlDecode(&key, key, &allocator), "Could not decode URL query key");
+                    BUBBLE(stringUrlDecode(&value, value, &allocator), "Could not decode URL query value");
                     lua_pushlstring(L, key.data, key.length);
-                    lua_pushlstring(L, decoded_value.data, decoded_value.length);
+                    lua_pushlstring(L, value.data, value.length);
                     lua_rawset(L, -3);
                 }
                 lua_setfield(L, -2, "queries");
