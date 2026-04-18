@@ -184,19 +184,26 @@ static int requestHandler(void* input_ptr) {
             Arena CLEAN(arenaDestroy) temp_allocator = {0};
             while (lua_next(L, -2) != 0) {
                 lua_pushvalue(L, -2);  // prevent key from being changed by lua_to(l)string
+                String key = {0};
+                key.data = (char*)lua_tolstring(L, -1, &key.length);
+                CATCH(stringUrlEncode(&key, key, &temp_allocator), "Could not encode cookie key\n");
                 if (lua_type(L, -2) != LUA_TTABLE) {
+                    String value = {0};
+                    value.data = (char*)lua_tolstring(L, -2, &value.length);
+                    CATCH(stringUrlEncode(&value, value, &temp_allocator), "Could not encode cookie value\n");
                     stringAppendf(
                         &cookie_builder,
                         &temp_allocator,
-                        "Set-Cookie: %s=%s\r\n",
-                        lua_tostring(L, -1),
-                        lua_tostring(L, -2)
+                        "Set-Cookie: %.*s=%.*s\r\n",
+                        FORMAT(key),
+                        FORMAT(value)
                     );
                 } else {
                     lua_getfield(L, -2, "value");
                     String value = {0};
                     value.data = (char*)lua_tolstring(L, -1, &value.length);
                     lua_pop(L, 1);
+                    CATCH(stringUrlEncode(&value, value, &temp_allocator), "Could not encode cookie value\n");
 
                     lua_getfield(L, -2, "max_age");
                     String max_age = {0};
@@ -237,9 +244,12 @@ static int requestHandler(void* input_ptr) {
                             value = "Lax";
                         } else if (stringCompare(same_site_value, STRING_LITERAL("none")) == 0) {
                             value = "None";
-                            if(secure.data == NULL) {
+                            if (secure.data == NULL) {
                                 // required
-                                CATCH(stringFormat(&secure, &temp_allocator, "; Secure"), "Could not set cookie secure");
+                                CATCH(
+                                    stringFormat(&secure, &temp_allocator, "; Secure"),
+                                    "Could not set cookie secure"
+                                );
                             }
                         }
                         if (value != NULL) {
@@ -254,8 +264,8 @@ static int requestHandler(void* input_ptr) {
                     stringAppendf(
                         &cookie_builder,
                         &temp_allocator,
-                        "Set-Cookie: %s=%.*s%.*s%.*s%.*s%.*s\r\n",
-                        lua_tostring(L, -1),
+                        "Set-Cookie: %.*s=%.*s%.*s%.*s%.*s%.*s\r\n",
+                        FORMAT(key),
                         FORMAT(value),
                         FORMAT(max_age),
                         FORMAT(http_only),
