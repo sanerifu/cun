@@ -6,8 +6,8 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <string.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "arena.c"
 #include "common.c"
@@ -99,7 +99,7 @@ static Result stringFormat(String* o_ret, Arena* allocator, char const* fmt, ...
 
     String ret;
     CATCH(arenaAllocate(&ret.data, allocator, length + 1), "Could not allocate formatted string\n");
-    
+
     va_start(ap, fmt);
     ret.length = length;
     vsnprintf(ret.data, ret.length + 1, fmt, ap);
@@ -127,12 +127,12 @@ static Result stringFromFile(String* o_ret, Arena* allocator, FILE* fp) {
 }
 
 static uint8_t hex2nibble(char digit) {
-    if('0' <= digit and digit <= '9') {
+    if ('0' <= digit and digit <= '9') {
         return digit - '0';
-    } else if('A' <= digit and digit <= 'F') {
-        return digit - 'A';
+    } else if ('A' <= digit and digit <= 'F') {
+        return digit - 'A' + 10;
     } else {
-        return digit - 'a';
+        return digit - 'a' + 10;
     }
 }
 
@@ -146,9 +146,9 @@ static Result stringUrlDecode(String* o_ret, String string, Arena* allocator) {
     CATCH(arenaAllocate(&ret.data, allocator, string.length), "Could not allocate decoded string\n");
     ret.length = 0;
 
-    for(size_t i = 0; i < string.length; i++) {
-        if(string.data[i] == '%') {
-            if(i > string.length - 3 || !isxdigit(string.data[i + 1]) || !isxdigit(string.data[i + 2])) {
+    for (size_t i = 0; i < string.length; i++) {
+        if (string.data[i] == '%') {
+            if (i > string.length - 3 || !isxdigit(string.data[i + 1]) || !isxdigit(string.data[i + 2])) {
                 fprintf(stderr, "Invalid percent encoding in \"%.*s\" at index %zu\n", FORMAT(string), i);
                 return INVALID_PERCENT_ENCODING;
             }
@@ -156,7 +156,7 @@ static Result stringUrlDecode(String* o_ret, String string, Arena* allocator) {
             ret.data[ret.length] = c;
             ret.length += 1;
             i += 2;
-        } else if(string.data[i] == '+') {
+        } else if (string.data[i] == '+') {
             ret.data[ret.length] = ' ';
             ret.length += 1;
         } else {
@@ -170,10 +170,10 @@ static Result stringUrlDecode(String* o_ret, String string, Arena* allocator) {
 }
 
 static char nibble2hex(uint8_t nibble) {
-    if(0x0 <= nibble and nibble <= 0x9) {
+    if (0x0 <= nibble and nibble <= 0x9) {
         return nibble + '0';
-    } else if(0xA <= nibble and nibble <= 0xF) {
-        return nibble + 'A';
+    } else if (0xA <= nibble and nibble <= 0xF) {
+        return nibble + 'A' - 10;
     } else {
         return '0';
     }
@@ -191,14 +191,17 @@ static Result stringUrlEncode(String* o_ret, String string, Arena* allocator) {
 
     String temp;
     Arena CLEAN(arenaDestroy) temp_allocator = {0};
-    CATCH(arenaAllocate(&temp.data, &temp_allocator, string.length * 3), "Could not allocate temporary encoded string\n");
+    CATCH(
+        arenaAllocate(&temp.data, &temp_allocator, string.length * 3),
+        "Could not allocate temporary encoded string\n"
+    );
     temp.length = 0;
 
-    for(size_t i = 0; i < string.length; i++) {
-        if(isalnum(string.data[i])) {
+    for (size_t i = 0; i < string.length; i++) {
+        if (isalnum(string.data[i])) {
             temp.data[temp.length] = string.data[i];
             temp.length += 1;
-        } else if(string.data[i] == ' ') {
+        } else if (string.data[i] == ' ') {
             temp.data[temp.length] = '+';
             temp.length += 1;
         } else {
