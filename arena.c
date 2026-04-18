@@ -20,8 +20,7 @@ static Result arenaAllocate(void* o_ret, Arena* io_self, size_t size) {
     if (self == NULL) {
         self = malloc(sizeof(struct Arena) + size);
         if (self == NULL) {
-            fprintf(stderr, "Out of memory!\n");
-            return OUT_OF_MEMORY;
+            THROW(OUT_OF_MEMORY, "");
         }
         self->capacity = size;
         self->size = 0;
@@ -30,8 +29,7 @@ static Result arenaAllocate(void* o_ret, Arena* io_self, size_t size) {
         size_t new_size = size > self->capacity * 2 ? size : self->capacity * 2;
         Arena new_node = malloc(sizeof(struct Arena) + new_size);
         if (new_node == NULL) {
-            fprintf(stderr, "Out of memory!\n");
-            return OUT_OF_MEMORY;
+            THROW(OUT_OF_MEMORY, "");
         }
         new_node->capacity = new_size;
         new_node->size = 0;

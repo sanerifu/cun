@@ -82,7 +82,7 @@ static int stringCompare(String left, String right) {
 static Result stringDuplicate(String* o_ret, String string, Arena* allocator) {
     Result result = SUCCESS;
     String ret;
-    CATCH(arenaAllocate(&ret.data, allocator, string.length + 1), "Could not duplicate string\n");
+    BUBBLE(arenaAllocate(&ret.data, allocator, string.length + 1), "Could not duplicate string");
     memcpy(ret.data, string.data, string.length);
     ret.length = string.length;
     ret.data[ret.length] = '\0';
@@ -98,7 +98,7 @@ static Result stringFormat(String* o_ret, Arena* allocator, char const* fmt, ...
     va_end(ap);
 
     String ret;
-    CATCH(arenaAllocate(&ret.data, allocator, length + 1), "Could not allocate formatted string\n");
+    BUBBLE(arenaAllocate(&ret.data, allocator, length + 1), "Could not allocate formatted string");
 
     va_start(ap, fmt);
     ret.length = length;
@@ -143,14 +143,18 @@ static uint8_t hex2byte(char upper, char lower) {
 static Result stringUrlDecode(String* o_ret, String string, Arena* allocator) {
     Result result;
     String ret;
-    CATCH(arenaAllocate(&ret.data, allocator, string.length), "Could not allocate decoded string\n");
+    BUBBLE(arenaAllocate(&ret.data, allocator, string.length), "Could not allocate decoded string");
     ret.length = 0;
 
     for (size_t i = 0; i < string.length; i++) {
         if (string.data[i] == '%') {
             if (i > string.length - 3 || !isxdigit(string.data[i + 1]) || !isxdigit(string.data[i + 2])) {
-                fprintf(stderr, "Invalid percent encoding in \"%.*s\" at index %zu\n", FORMAT(string), i);
-                return INVALID_PERCENT_ENCODING;
+                THROW(
+                    INVALID_PERCENT_ENCODING,
+                    "\"%.*s\" at index %zu",
+                    FORMAT(string),
+                    i
+                );
             }
             char c = (char)hex2byte(string.data[i + 1], string.data[i + 2]);
             ret.data[ret.length] = c;
@@ -191,10 +195,7 @@ static Result stringUrlEncode(String* o_ret, String string, Arena* allocator) {
 
     String temp;
     Arena CLEAN(arenaDestroy) temp_allocator = {0};
-    CATCH(
-        arenaAllocate(&temp.data, &temp_allocator, string.length * 3),
-        "Could not allocate temporary encoded string\n"
-    );
+    BUBBLE(arenaAllocate(&temp.data, &temp_allocator, string.length * 3), "Could not allocate temporary encoded string");
     temp.length = 0;
 
     for (size_t i = 0; i < string.length; i++) {
@@ -215,7 +216,7 @@ static Result stringUrlEncode(String* o_ret, String string, Arena* allocator) {
         }
     }
 
-    CATCH(arenaAllocate(&ret.data, allocator, temp.length + 1), "Could not allocate encoded string\n");
+    BUBBLE(arenaAllocate(&ret.data, allocator, temp.length + 1), "Could not allocate encoded string");
     ret.length = temp.length;
     memcpy(ret.data, temp.data, temp.length * sizeof(char));
     ret.data[ret.length] = '\0';

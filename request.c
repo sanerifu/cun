@@ -52,32 +52,32 @@ static Result readRequestHeader(
         String buffer = LSTRING(buf, sizeof(buf));
         int read_size = 0;
         while ((read_size = recv(socket, buffer.data, buffer.length - 1, 0)) != 0) {
-            WRAP(RECEIVE_ERROR, read_size, "Could not receive: %s\n", strerror(errno));
+            ASSERT(RECEIVE_ERROR, read_size >= 0, "%s", strerror(errno));
             char* end_position = strstr(buf, "\r\n\r\n");
             if (end_position != NULL) {
                 size_t last_header_length = end_position - buf;
-                CATCH(
+                BUBBLE(
                     stringAppend(&header_builder, LSTRING(buffer.data, last_header_length), temp_allocator),
-                    "Could not push last part of header\n"
+                    "Could not push last part of header"
                 );
-                CATCH(
+                BUBBLE(
                     stringAppend(
                         o_body_builder,
                         LSTRING(end_position + 4, read_size - last_header_length - 4),
                         temp_allocator
                     ),
-                    "Could not push first part of body\n"
+                    "Could not push first part of body"
                 );
                 break;
             }
-            CATCH(
+            BUBBLE(
                 stringAppend(&header_builder, LSTRING(buffer.data, read_size), temp_allocator),
-                "Could not append the read buffer\n"
+                "Could not append the read buffer"
             );
         }
     }
 
-    CATCH(stringBuild(o_header, &header_builder, allocator), "Could not build request header string\n");
+    BUBBLE(stringBuild(o_header, &header_builder, allocator), "Could not build request header string");
 
     return SUCCESS;
 }
@@ -103,21 +103,19 @@ static Result parseRequestHeader(RequestHeader* o_ret, String header, Arena* all
     } else if (stringCompare(method, STRING_LITERAL("DELETE")) == 0) {
         ret.method = DELETE_REQUEST;
     } else {
-        fprintf(stderr, "Unrecognized HTTP method: \"%.*s\"\n", FORMAT(method));
-        return UNRECOGNIZED_HTTP_METHOD;
+        THROW(UNRECOGNIZED_HTTP_METHOD, "\"%.*s\"", FORMAT(method));
     }
     ret.queries = stringSplit(&http_start, STRING_LITERAL(" "));
     String path = stringSplit(&ret.queries, STRING_LITERAL("?"));
-    CATCH(stringUrlDecode(&ret.path, path, allocator), "Could not decode URL string");
+    BUBBLE(stringUrlDecode(&ret.path, path, allocator), "Could not decode URL string");
 
     String http_version = stringSplit(&http_start, STRING_LITERAL(" "));
-    if(stringCompare(http_version, STRING_LITERAL("HTTP/1.1")) == 0) {
+    if (stringCompare(http_version, STRING_LITERAL("HTTP/1.1")) == 0) {
         ret.version = HTTP_1_1;
-    } else if(stringCompare(http_version, STRING_LITERAL("HTTP/1.0")) == 0) {
+    } else if (stringCompare(http_version, STRING_LITERAL("HTTP/1.0")) == 0) {
         ret.version = HTTP_1_0;
     } else {
-        fprintf(stderr, "Unsupported HTTP version \"%.*s\"", FORMAT(http_version));
-        return UNSUPPORTED_HTTP_VERSION;
+        THROW(UNSUPPORTED_HTTP_VERSION, "\"%.*s\"", FORMAT(http_version));
     }
 
     while ((line = stringSplit(&header, STRING_LITERAL("\r\n"))).data) {
@@ -126,12 +124,12 @@ static Result parseRequestHeader(RequestHeader* o_ret, String header, Arena* all
 
         if (stringCompare(key, STRING_LITERAL("Content-Length")) == 0) {
             String value_copy = {0};
-            CATCH(
+            BUBBLE(
                 stringDuplicate(&value_copy, value, &temp_allocator),
                 "Could not allocate null-terminated string for content length"
             );
             ret.content_length = strtoull(value_copy.data, NULL, 10);
-        } else if(stringCompare(key, STRING_LITERAL("Cookie")) == 0) {
+        } else if (stringCompare(key, STRING_LITERAL("Cookie")) == 0) {
             ret.cookies = stringTrim(value);
         } else if (stringCompare(key, STRING_LITERAL("User-Agent")) == 0) {
             ret.user_agent = stringTrim(value);
@@ -154,14 +152,14 @@ static Result readRequestBody(
     size_t remaining_body_length = header->content_length - stringBuilderLength(*io_body_builder);
     if (header->content_length > stringBuilderLength(*io_body_builder)) {
         char* remaining_body = NULL;
-        CATCH(
+        BUBBLE(
             arenaAllocate(&remaining_body, temp_allocator, remaining_body_length),
-            "Could not allocate remaining body buffer\n"
+            "Could not allocate remaining body buffer"
         );
-        WRAP(RECEIVE_ERROR, recv(socket, remaining_body, remaining_body_length, 0), "Could not read remaining body\n");
+        ASSERT(RECEIVE_ERROR, recv(socket, remaining_body, remaining_body_length, 0) >= 0, "Could not read remaining body");
         stringAppend(io_body_builder, LSTRING(remaining_body, remaining_body_length), temp_allocator);
     }
-    CATCH(stringBuild(o_body, io_body_builder, allocator), "Could not build request body string\n");
+    BUBBLE(stringBuild(o_body, io_body_builder, allocator), "Could not build request body string");
 
     return SUCCESS;
 }

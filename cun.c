@@ -76,14 +76,14 @@ static int requestHandler(void* input_ptr) {
     {
         StringBuilder body_builder = {0};
         Arena CLEAN(arenaDestroy) temp_allocator = {0};
-        CATCH(
+        BUBBLE(
             readRequestHeader(&header, &body_builder, socket, &allocator, &temp_allocator),
-            "Could not read request header\n"
+            "Could not read request header"
         );
-        CATCH(parseRequestHeader(&parsed_header, header, &allocator), "Could not parse request header\n");
-        CATCH(
+        BUBBLE(parseRequestHeader(&parsed_header, header, &allocator), "Could not parse request header");
+        BUBBLE(
             readRequestBody(&body, &body_builder, socket, &parsed_header, &allocator, &temp_allocator),
-            "Could not read request body\n"
+            "Could not read request body"
         );
     }
 
@@ -103,7 +103,7 @@ static int requestHandler(void* input_ptr) {
                 "   <h1>Requested page is malformed</h1>\n"
                 "</body>\n"
                 "</html>\n";
-            CATCH(
+            BUBBLE(
                 stringFormat(
                     &formatted,
                     &allocator,
@@ -126,7 +126,7 @@ static int requestHandler(void* input_ptr) {
     String formatted;
 
     String lua_content_path;
-    CATCH(
+    BUBBLE(
         stringFormat(&lua_content_path, &allocator, ".%.*s.lua", FORMAT(parsed_header.path)),
         "Could not create path"
     );
@@ -135,7 +135,7 @@ static int requestHandler(void* input_ptr) {
     String lua_data = LSTRING(NULL, 0);
 
     if ((fp = fopen(lua_content_path.data, "rb"))) {
-        CATCH(stringFromFile(&lua_data, &allocator, fp), "Could not read from file\n");
+        BUBBLE(stringFromFile(&lua_data, &allocator, fp), "Could not read from file");
     }
 
     if (fp != NULL) {
@@ -168,7 +168,7 @@ static int requestHandler(void* input_ptr) {
                     String key = stringSplit(&query, STRING_LITERAL("="));
                     String value = query;
                     String decoded_value;
-                    CATCH(stringUrlDecode(&decoded_value, value, &allocator), "Could not decode URL query\n");
+                    BUBBLE(stringUrlDecode(&decoded_value, value, &allocator), "Could not decode URL query");
                     lua_pushlstring(L, key.data, key.length);
                     lua_pushlstring(L, decoded_value.data, decoded_value.length);
                     lua_rawset(L, -3);
@@ -183,12 +183,10 @@ static int requestHandler(void* input_ptr) {
                 while ((cookie = stringSplit(&cookies, STRING_LITERAL(";"))).data) {
                     String key = stringTrim(stringSplit(&cookie, STRING_LITERAL("=")));
                     String value = stringTrim(cookie);
-                    String decoded_key;
-                    String decoded_value;
-                    CATCH(stringUrlDecode(&decoded_key, key, &allocator), "Could not decode cookie key\n");
-                    CATCH(stringUrlDecode(&decoded_value, value, &allocator), "Could not decode cookie value\n");
-                    lua_pushlstring(L, decoded_key.data, decoded_key.length);
-                    lua_pushlstring(L, decoded_value.data, decoded_value.length);
+                    BUBBLE(stringUrlDecode(&key, key, &allocator), "Could not decode cookie key");
+                    BUBBLE(stringUrlDecode(&value, value, &allocator), "Could not decode cookie value");
+                    lua_pushlstring(L, key.data, key.length);
+                    lua_pushlstring(L, value.data, value.length);
                     lua_rawset(L, -3);
                 }
                 lua_setfield(L, -2, "cookies");
@@ -222,11 +220,11 @@ static int requestHandler(void* input_ptr) {
                 lua_pushvalue(L, -2);  // prevent key from being changed by lua_to(l)string
                 String key = {0};
                 key.data = (char*)lua_tolstring(L, -1, &key.length);
-                CATCH(stringUrlEncode(&key, key, &temp_allocator), "Could not encode cookie key\n");
+                BUBBLE(stringUrlEncode(&key, key, &temp_allocator), "Could not encode cookie key");
                 if (lua_type(L, -2) != LUA_TTABLE) {
                     String value = {0};
                     value.data = (char*)lua_tolstring(L, -2, &value.length);
-                    CATCH(stringUrlEncode(&value, value, &temp_allocator), "Could not encode cookie value\n");
+                    BUBBLE(stringUrlEncode(&value, value, &temp_allocator), "Could not encode cookie value");
                     stringAppendf(
                         &cookie_builder,
                         &temp_allocator,
@@ -239,12 +237,12 @@ static int requestHandler(void* input_ptr) {
                     String value = {0};
                     value.data = (char*)lua_tolstring(L, -1, &value.length);
                     lua_pop(L, 1);
-                    CATCH(stringUrlEncode(&value, value, &temp_allocator), "Could not encode cookie value\n");
+                    BUBBLE(stringUrlEncode(&value, value, &temp_allocator), "Could not encode cookie value");
 
                     lua_getfield(L, -2, "max_age");
                     String max_age = {0};
                     if (lua_isnumber(L, -1)) {
-                        CATCH(
+                        BUBBLE(
                             stringFormat(&max_age, &temp_allocator, "; Max-Age=%d", lua_tointeger(L, -1)),
                             "Could not set max age of cookie"
                         );
@@ -254,7 +252,7 @@ static int requestHandler(void* input_ptr) {
                     lua_getfield(L, -2, "http_only");
                     String http_only = {0};
                     if (lua_toboolean(L, -1)) {
-                        CATCH(
+                        BUBBLE(
                             stringFormat(&http_only, &temp_allocator, "; HttpOnly"),
                             "Could not set cookie Http only"
                         );
@@ -264,7 +262,7 @@ static int requestHandler(void* input_ptr) {
                     lua_getfield(L, -2, "secure");
                     String secure = {0};
                     if (lua_toboolean(L, -1)) {
-                        CATCH(stringFormat(&secure, &temp_allocator, "; Secure"), "Could not set cookie secure");
+                        BUBBLE(stringFormat(&secure, &temp_allocator, "; Secure"), "Could not set cookie secure");
                     }
                     lua_pop(L, 1);
 
@@ -282,14 +280,14 @@ static int requestHandler(void* input_ptr) {
                             value = "None";
                             if (secure.data == NULL) {
                                 // required
-                                CATCH(
+                                BUBBLE(
                                     stringFormat(&secure, &temp_allocator, "; Secure"),
                                     "Could not set cookie secure"
                                 );
                             }
                         }
                         if (value != NULL) {
-                            CATCH(
+                            BUBBLE(
                                 stringFormat(&same_site, &temp_allocator, "; SameSite=%s", value),
                                 "Could not set cookie's same site value"
                             )
@@ -313,7 +311,7 @@ static int requestHandler(void* input_ptr) {
             }
             stringBuild(&cookies, &cookie_builder, &temp_allocator);
 
-            CATCH(
+            BUBBLE(
                 stringFormat(
                     &formatted,
                     &allocator,
@@ -348,7 +346,7 @@ static int requestHandler(void* input_ptr) {
             "   <h1>Requested page not found</h1>\n"
             "</body>\n"
             "</html>\n";
-        CATCH(
+        BUBBLE(
             stringFormat(
                 &formatted,
                 &allocator,
@@ -378,15 +376,14 @@ static int serverLoop(void* sock) {
     socklen_t address_length = sizeof(address);
 
     while (true) {
-        WRAP(LISTEN_ERROR, listen(server_socket, 3), "Listening Error: %s\n", strerror(errno));
+        ASSERT(LISTEN_ERROR, listen(server_socket, 3) == 0, "%s", strerror(errno));
 
         if ((client_socket = accept(server_socket, (struct sockaddr*)&address, &address_length)) < 0) {
             if (errno == EINVAL) {
                 fprintf(stderr, "Closing...\n");
                 break;
             }
-            fprintf(stderr, "Accepting Error: %d %s\n", errno, strerror(errno));
-            return ACCEPT_ERROR;
+            THROW(ACCEPT_ERROR, "%s\n", strerror(errno));
         }
 
         char ip[16];
@@ -413,7 +410,7 @@ int main() {
     };
     socklen_t address_length = sizeof(address);
 
-    WRAP(SOCKET_ERROR, server_socket, "Socket Error: %s\n", strerror(errno));
+    ASSERT(SOCKET_ERROR, server_socket >= 0, "%s", strerror(errno));
 
     {
         int option = 1;
@@ -421,9 +418,7 @@ int main() {
     }
 
     if (bind(server_socket, (struct sockaddr*)&address, sizeof(address)) < 0) {
-        fprintf(stderr, "Bind Error: %s\n", strerror(errno));
-        close(server_socket);
-        return BIND_ERROR;
+        THROW(BIND_ERROR, "%s", strerror(errno));
     }
 
     thrd_t server_thread;
@@ -435,6 +430,7 @@ int main() {
             fprintf(stderr, "Shutting down the server\n");
             free(line);
             break;
+        } else if (strcmp(line, "") == 0) {
         } else {
             fprintf(stderr, "Unrecognized command: \"%s\"\n", line);
         }
