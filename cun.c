@@ -87,6 +87,42 @@ static int requestHandler(void* input_ptr) {
         );
     }
 
+    for (size_t i = 0; i < parsed_header.path.length - 1; i++) {
+        if (parsed_header.path.data[i] == '.' and parsed_header.path.data[i + 1] == '.' and
+            (i == 0 or parsed_header.path.data[i - 1] == '/') and
+            (i == parsed_header.path.length - 2 or parsed_header.path.data[i + 2] == '/')) {
+            String formatted = {0};
+            char error_page[] =
+                "<!DOCTYPE html>\n"
+                "<html>\n"
+                "<head>\n"
+                "   <meta charset=\"utf-8\" />\n"
+                "   <title>Bad Request</title>\n"
+                "</head>\n"
+                "<body>\n"
+                "   <h1>Requested page is malformed</h1>\n"
+                "</body>\n"
+                "</html>\n";
+            CATCH(
+                stringFormat(
+                    &formatted,
+                    &allocator,
+                    "HTTP/1.1 400 Bad Request\r\n"
+                    "Content-Length: %zu\r\n"
+                    "Content-Type: text/html\r\n"
+                    "\r\n"
+                    "%s",
+
+                    sizeof(error_page) - 1,
+                    error_page
+                ),
+                "Could not allocate formatted string"
+            );
+            send(socket, formatted.data, formatted.length, 0);
+            return SUCCESS;
+        }
+    }
+
     String formatted;
 
     String lua_content_path;
