@@ -156,7 +156,11 @@ static Result readRequestBody(
             arenaAllocate(&remaining_body, temp_allocator, remaining_body_length),
             "Could not allocate remaining body buffer"
         );
-        ASSERT(RECEIVE_ERROR, recv(socket, remaining_body, remaining_body_length, 0) >= 0, "Could not read remaining body");
+        ASSERT(
+            RECEIVE_ERROR,
+            recv(socket, remaining_body, remaining_body_length, 0) >= 0,
+            "Could not read remaining body"
+        );
         stringAppend(io_body_builder, LSTRING(remaining_body, remaining_body_length), temp_allocator);
     }
     BUBBLE(stringBuild(o_body, io_body_builder, allocator), "Could not build request body string");

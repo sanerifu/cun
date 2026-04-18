@@ -149,12 +149,7 @@ static Result stringUrlDecode(String* o_ret, String string, Arena* allocator) {
     for (size_t i = 0; i < string.length; i++) {
         if (string.data[i] == '%') {
             if (i > string.length - 3 || !isxdigit(string.data[i + 1]) || !isxdigit(string.data[i + 2])) {
-                THROW(
-                    INVALID_PERCENT_ENCODING,
-                    "\"%.*s\" at index %zu",
-                    FORMAT(string),
-                    i
-                );
+                THROW(INVALID_PERCENT_ENCODING, "\"%.*s\" at index %zu", FORMAT(string), i);
             }
             char c = (char)hex2byte(string.data[i + 1], string.data[i + 2]);
             ret.data[ret.length] = c;
@@ -195,7 +190,10 @@ static Result stringUrlEncode(String* o_ret, String string, Arena* allocator) {
 
     String temp;
     Arena CLEAN(arenaDestroy) temp_allocator = {0};
-    BUBBLE(arenaAllocate(&temp.data, &temp_allocator, string.length * 3), "Could not allocate temporary encoded string");
+    BUBBLE(
+        arenaAllocate(&temp.data, &temp_allocator, string.length * 3),
+        "Could not allocate temporary encoded string"
+    );
     temp.length = 0;
 
     for (size_t i = 0; i < string.length; i++) {

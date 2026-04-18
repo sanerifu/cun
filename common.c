@@ -15,7 +15,7 @@ static void closeWrapper(void* data) {
 
 static void fcloseWrapper(void* data) {
     FILE* fp = *(FILE**)data;
-    if(fp != NULL) {
+    if (fp != NULL) {
         fclose(fp);
     }
 }

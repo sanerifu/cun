@@ -17,22 +17,36 @@ typedef enum {
     INVALID_PERCENT_ENCODING
 } Result;
 
-#define THROW(result, fmt, ...)                                                                          \
-    do {                                                                                                 \
-        fprintf(stderr, "%s %s:%d \x1b[41m" #result ": " fmt "\x1b[0m\n", __func__, __FILE__, __LINE__, ##__VA_ARGS__); \
-        return result;                                                                                   \
+#define THROW(result, fmt, ...)                               \
+    do {                                                      \
+        fprintf(                                              \
+            stderr,                                           \
+            "%s %s:%d \x1b[41m" #result ": " fmt "\x1b[0m\n", \
+            __func__,                                         \
+            __FILE__,                                         \
+            __LINE__,                                         \
+            ##__VA_ARGS__                                     \
+        );                                                    \
+        return result;                                        \
     } while (0)
 
-#define BUBBLE(expr, fmt, ...)                                                               \
-    if ((result = expr)) {                                                                  \
+#define BUBBLE(expr, fmt, ...)                                                                             \
+    if ((result = expr)) {                                                                                 \
         fprintf(stderr, "%s %s:%d \x1b[31m" fmt "\x1b[0m\n", __func__, __FILE__, __LINE__, ##__VA_ARGS__); \
-        return result;                                                                      \
+        return result;                                                                                     \
     }
 
-#define ASSERT(result, expr, fmt, ...)                                                                   \
-    if (not(expr)) {                                                                                     \
-        fprintf(stderr, "%s %s:%d \x1b[41m" #result ": " fmt "\x1b[0m\n", __func__, __FILE__, __LINE__, ##__VA_ARGS__); \
-        return result;                                                                                   \
+#define ASSERT(result, expr, fmt, ...)                        \
+    if (not(expr)) {                                          \
+        fprintf(                                              \
+            stderr,                                           \
+            "%s %s:%d \x1b[41m" #result ": " fmt "\x1b[0m\n", \
+            __func__,                                         \
+            __FILE__,                                         \
+            __LINE__,                                         \
+            ##__VA_ARGS__                                     \
+        );                                                    \
+        return result;                                        \
     }
 
 #endif
