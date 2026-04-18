@@ -385,15 +385,12 @@ static int serverLoop(void* sock) {
             }
             THROW(ACCEPT_ERROR, "%s\n", strerror(errno));
         }
-
-        char ip[16];
-        inet_ntop(AF_INET, &address, ip, address_length);
-        printf("Connected to %s\n", ip);
-
+        
         thrd_t thread;
         RequestHandlerInput* input = malloc(sizeof(*input));
         input->socket = client_socket;
-        memcpy(input->ip, ip, sizeof(ip));
+        inet_ntop(AF_INET, &address, input->ip, sizeof(input->ip));
+        printf("Connected to %s\n", input->ip);
         thrd_create(&thread, &requestHandler, input);
     }
 

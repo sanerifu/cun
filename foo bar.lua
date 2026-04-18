@@ -2,10 +2,6 @@ local inspect = require('inspect')
 
 print(inspect.inspect(request))
 
-local logs = assert(io.open("logs.txt", "a"))
-logs:write(("[%s] I connected with %s\n"):format(os.date("!%Y-%m-%d %H:%M:%S"), request.ip))
-logs:close()
-
 local counter = request.cookies.counter and request.cookies.counter or "|"
 
 return {
