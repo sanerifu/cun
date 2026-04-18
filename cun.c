@@ -417,9 +417,7 @@ int main() {
         setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
     }
 
-    if (bind(server_socket, (struct sockaddr*)&address, sizeof(address)) < 0) {
-        THROW(BIND_ERROR, "%s", strerror(errno));
-    }
+    ASSERT(BIND_ERROR, bind(server_socket, (struct sockaddr*)&address, sizeof(address)) >= 0, "%s", strerror(errno))
 
     thrd_t server_thread;
     thrd_create(&server_thread, &serverLoop, &server_socket);
