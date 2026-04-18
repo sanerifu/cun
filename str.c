@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include "arena.c"
+#include "common.c"
 #include "result.c"
 
 typedef struct String String;
@@ -165,6 +166,59 @@ static Result stringUrlDecode(String* o_ret, String string, Arena* allocator) {
     }
 
     *o_ret = ret;
+    return SUCCESS;
+}
+
+static char nibble2hex(uint8_t nibble) {
+    if(0x0 <= nibble and nibble <= 0x9) {
+        return nibble + '0';
+    } else if(0xA <= nibble and nibble <= 0xF) {
+        return nibble + 'A';
+    } else {
+        return '0';
+    }
+}
+
+static uint16_t byte2hex(uint8_t byte) {
+    uint16_t upper = (uint16_t)nibble2hex((byte & 0xF0) >> 4);
+    uint16_t lower = (uint16_t)nibble2hex(byte & 0xF);
+    return (upper << 8) | lower;
+}
+
+static Result stringUrlEncode(String* o_ret, String string, Arena* allocator) {
+    Result result;
+    String ret;
+
+    String temp;
+    Arena CLEAN(arenaDestroy) temp_allocator = {0};
+    CATCH(arenaAllocate(&temp.data, &temp_allocator, string.length * 3), "Could not allocate temporary encoded string\n");
+    temp.length = 0;
+
+    for(size_t i = 0; i < string.length; i++) {
+        if(isalnum(string.data[i])) {
+            temp.data[temp.length] = string.data[i];
+            temp.length += 1;
+        } else if(string.data[i] == ' ') {
+            temp.data[temp.length] = '+';
+            temp.length += 1;
+        } else {
+            uint16_t hexes = byte2hex(string.data[i]);
+            char first = (hexes & 0xFF00) >> 8;
+            char second = hexes & 0xFF;
+            temp.data[temp.length] = '%';
+            temp.data[temp.length + 1] = first;
+            temp.data[temp.length + 2] = second;
+            temp.length += 3;
+        }
+    }
+
+    CATCH(arenaAllocate(&ret.data, allocator, temp.length + 1), "Could not allocate encoded string\n");
+    ret.length = temp.length;
+    memcpy(ret.data, temp.data, temp.length * sizeof(char));
+    ret.data[ret.length] = '\0';
+
+    *o_ret = ret;
+
     return SUCCESS;
 }
 
