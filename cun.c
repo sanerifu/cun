@@ -65,6 +65,183 @@ struct RequestHandlerInput {
     char ip[16];
 };
 
+static char const* getMimeType(String filename) {
+    if (filename.length == 0) {
+        return "application/octet-stream";
+    }
+    size_t extension_start;
+    for (extension_start = filename.length - 1; extension_start > 0; extension_start--) {
+        if (filename.data[extension_start] == '/') {
+            return "application/octet-stream";
+        }
+        if (filename.data[extension_start] == '.') {
+            break;
+        }
+    }
+
+    String extension = LSTRING(filename.data + extension_start, filename.length - extension_start);
+    if (stringCompare(extension, STRING_LITERAL(".htm")) == 0 or
+        stringCompare(extension, STRING_LITERAL(".html")) == 0) {
+        return "text/html";
+    } else if (stringCompare(extension, STRING_LITERAL(".css")) == 0) {
+        return "text/css";
+    } else if (stringCompare(extension, STRING_LITERAL(".js")) == 0) {
+        return "application/javascript";
+    } else if (stringCompare(extension, STRING_LITERAL(".png")) == 0) {
+        return "image/png";
+    } else if (stringCompare(extension, STRING_LITERAL(".jpg")) == 0 or
+               stringCompare(extension, STRING_LITERAL(".jpeg")) == 0) {
+        return "image/jpeg";
+    } else if (stringCompare(extension, STRING_LITERAL(".svg")) == 0) {
+        return "image/svg+xml";
+    } else if (stringCompare(extension, STRING_LITERAL(".json")) == 0) {
+        return "application/json";
+    } else if (stringCompare(extension, STRING_LITERAL(".txt")) == 0) {
+        return "text/plain";
+    } else if (stringCompare(extension, STRING_LITERAL(".lua")) == 0) {
+        return "text/x-lua";
+    } else if (stringCompare(extension, STRING_LITERAL(".luac")) == 0) {
+        return "application/x-lua-bytecode";
+    } else if (stringCompare(extension, STRING_LITERAL(".aac")) == 0) {
+        return "audio/aac";
+    } else if (stringCompare(extension, STRING_LITERAL(".abw")) == 0) {
+        return "application/x-abiword";
+    } else if (stringCompare(extension, STRING_LITERAL(".apng")) == 0) {
+        return "image/apng";
+    } else if (stringCompare(extension, STRING_LITERAL(".arc")) == 0) {
+        return "application/x-freearc";
+    } else if (stringCompare(extension, STRING_LITERAL(".avif")) == 0) {
+        return "image/avif";
+    } else if (stringCompare(extension, STRING_LITERAL(".avi")) == 0) {
+        return "video/x-msvideo";
+    } else if (stringCompare(extension, STRING_LITERAL(".azw")) == 0) {
+        return "application/vnd.amazon.ebook";
+    } else if (stringCompare(extension, STRING_LITERAL(".bin")) == 0) {
+        return "application/octet-stream";
+    } else if (stringCompare(extension, STRING_LITERAL(".bmp")) == 0) {
+        return "image/bmp";
+    } else if (stringCompare(extension, STRING_LITERAL(".bz")) == 0) {
+        return "application/x-bzip";
+    } else if (stringCompare(extension, STRING_LITERAL(".bz2")) == 0) {
+        return "application/x-bzip2";
+    } else if (stringCompare(extension, STRING_LITERAL(".cda")) == 0) {
+        return "application/x-cdf";
+    } else if (stringCompare(extension, STRING_LITERAL(".csh")) == 0) {
+        return "application/x-csh";
+    } else if (stringCompare(extension, STRING_LITERAL(".csv")) == 0) {
+        return "text/csv";
+    } else if (stringCompare(extension, STRING_LITERAL(".doc")) == 0) {
+        return "application/msword";
+    } else if (stringCompare(extension, STRING_LITERAL(".docx")) == 0) {
+        return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    } else if (stringCompare(extension, STRING_LITERAL(".eot")) == 0) {
+        return "application/vnd.ms-fontobject";
+    } else if (stringCompare(extension, STRING_LITERAL(".epub")) == 0) {
+        return "application/epub+zip";
+    } else if (stringCompare(extension, STRING_LITERAL(".gz")) == 0) {
+        return "application/gzip";
+    } else if (stringCompare(extension, STRING_LITERAL(".gif")) == 0) {
+        return "image/gif";
+    } else if (stringCompare(extension, STRING_LITERAL(".ico")) == 0) {
+        return "image/vnd.microsoft.icon";
+    } else if (stringCompare(extension, STRING_LITERAL(".ics")) == 0) {
+        return "text/calendar";
+    } else if (stringCompare(extension, STRING_LITERAL(".jar")) == 0) {
+        return "application/java-archive";
+    } else if (stringCompare(extension, STRING_LITERAL(".jsonld")) == 0) {
+        return "application/ld+json";
+    } else if (stringCompare(extension, STRING_LITERAL(".md")) == 0) {
+        return "text/markdown";
+    } else if (stringCompare(extension, STRING_LITERAL(".mid")) == 0 or
+               stringCompare(extension, STRING_LITERAL(".midi")) == 0) {
+        return "audio/midi";
+    } else if (stringCompare(extension, STRING_LITERAL(".mjs")) == 0) {
+        return "text/javascript";
+    } else if (stringCompare(extension, STRING_LITERAL(".mp3")) == 0) {
+        return "audio/mpeg";
+    } else if (stringCompare(extension, STRING_LITERAL(".mp4")) == 0) {
+        return "video/mp4";
+    } else if (stringCompare(extension, STRING_LITERAL(".mpeg")) == 0) {
+        return "video/mpeg";
+    } else if (stringCompare(extension, STRING_LITERAL(".mpkg")) == 0) {
+        return "application/vnd.apple.installer+xml";
+    } else if (stringCompare(extension, STRING_LITERAL(".odp")) == 0) {
+        return "application/vnd.oasis.opendocument.presentation";
+    } else if (stringCompare(extension, STRING_LITERAL(".ods")) == 0) {
+        return "application/vnd.oasis.opendocument.spreadsheet";
+    } else if (stringCompare(extension, STRING_LITERAL(".odt")) == 0) {
+        return "application/vnd.oasis.opendocument.text";
+    } else if (stringCompare(extension, STRING_LITERAL(".oga")) == 0) {
+        return "audio/ogg";
+    } else if (stringCompare(extension, STRING_LITERAL(".ogv")) == 0) {
+        return "video/ogg";
+    } else if (stringCompare(extension, STRING_LITERAL(".ogx")) == 0) {
+        return "application/ogg";
+    } else if (stringCompare(extension, STRING_LITERAL(".opus")) == 0) {
+        return "audio/ogg";
+    } else if (stringCompare(extension, STRING_LITERAL(".otf")) == 0) {
+        return "font/otf";
+    } else if (stringCompare(extension, STRING_LITERAL(".pdf")) == 0) {
+        return "application/pdf";
+    } else if (stringCompare(extension, STRING_LITERAL(".php")) == 0) {
+        return "application/x-httpd-php";
+    } else if (stringCompare(extension, STRING_LITERAL(".ppt")) == 0) {
+        return "application/vnd.ms-powerpoint";
+    } else if (stringCompare(extension, STRING_LITERAL(".pptx")) == 0) {
+        return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    } else if (stringCompare(extension, STRING_LITERAL(".rar")) == 0) {
+        return "application/vnd.rar";
+    } else if (stringCompare(extension, STRING_LITERAL(".rtf")) == 0) {
+        return "application/rtf";
+    } else if (stringCompare(extension, STRING_LITERAL(".sh")) == 0) {
+        return "application/x-sh";
+    } else if (stringCompare(extension, STRING_LITERAL(".tar")) == 0) {
+        return "application/x-tar";
+    } else if (stringCompare(extension, STRING_LITERAL(".tif")) == 0 or
+               stringCompare(extension, STRING_LITERAL(".tiff")) == 0) {
+        return "image/tiff";
+    } else if (stringCompare(extension, STRING_LITERAL(".ts")) == 0) {
+        return "video/mp2t";
+    } else if (stringCompare(extension, STRING_LITERAL(".ttf")) == 0) {
+        return "font/ttf";
+    } else if (stringCompare(extension, STRING_LITERAL(".vsd")) == 0) {
+        return "application/vnd.visio";
+    } else if (stringCompare(extension, STRING_LITERAL(".wav")) == 0) {
+        return "audio/wav";
+    } else if (stringCompare(extension, STRING_LITERAL(".weba")) == 0) {
+        return "audio/webm";
+    } else if (stringCompare(extension, STRING_LITERAL(".webm")) == 0) {
+        return "video/webm";
+    } else if (stringCompare(extension, STRING_LITERAL(".webmanifest")) == 0) {
+        return "application/manifest+json";
+    } else if (stringCompare(extension, STRING_LITERAL(".webp")) == 0) {
+        return "image/webp";
+    } else if (stringCompare(extension, STRING_LITERAL(".woff")) == 0) {
+        return "font/woff";
+    } else if (stringCompare(extension, STRING_LITERAL(".woff2")) == 0) {
+        return "font/woff2";
+    } else if (stringCompare(extension, STRING_LITERAL(".xhtml")) == 0) {
+        return "application/xhtml+xml";
+    } else if (stringCompare(extension, STRING_LITERAL(".xls")) == 0) {
+        return "application/vnd.ms-excel";
+    } else if (stringCompare(extension, STRING_LITERAL(".xlsx")) == 0) {
+        return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    } else if (stringCompare(extension, STRING_LITERAL(".xml")) == 0) {
+        return "application/xml";
+    } else if (stringCompare(extension, STRING_LITERAL(".xul")) == 0) {
+        return "application/vnd.mozilla.xul+xml";
+    } else if (stringCompare(extension, STRING_LITERAL(".zip")) == 0) {
+        return "application/zip";
+    } else if (stringCompare(extension, STRING_LITERAL(".3gp")) == 0) {
+        return "video/3gpp";
+    } else if (stringCompare(extension, STRING_LITERAL(".3g2")) == 0) {
+        return "video/3gpp2";
+    } else if (stringCompare(extension, STRING_LITERAL(".7z")) == 0) {
+        return "application/x-7z-compressed";
+    }
+    return "application/octet-stream";
+}
+
 static int requestHandler(void* input_ptr) {
     void* CLEAN(free) _socket_ptr_copy = input_ptr;
 
@@ -133,11 +310,14 @@ static int requestHandler(void* input_ptr) {
     FILE* CLEAN(fclose) fp = NULL;
     String path = {0};
     BUBBLE(stringFormat(&path, &allocator, ".%.*s", FORMAT(parsed_header.path)), "Could not format path");
-    fprintf(stderr, "serving %.*s\n", FORMAT(path));
     if ((fp = fopen(path.data, "rb"))) {
+        fprintf(stderr, "Serving %.*s\n", FORMAT(path));
         fseek(fp, 0, SEEK_END);
         size_t length = ftell(fp);
         fseek(fp, 0, SEEK_SET);
+
+        String file = {0};
+        BUBBLE(stringFromFile(&file, &allocator, fp), "Could not read file");
 
         String formatted = {0};
         BUBBLE(
@@ -146,15 +326,17 @@ static int requestHandler(void* input_ptr) {
                 &allocator,
                 "HTTP/1.1 200 OK\r\n"
                 "Content-Length: %zu\r\n"
-                "\r\n",
+                "Content-Type: %s\r\n"
+                "\r\n"
+                "%.*s",
 
-                length
+                length,
+                getMimeType(path),
+                FORMAT(file)
             ),
             "Could not format response header"
         );
         send(socket, formatted.data, formatted.length, 0);
-
-        sendfile(socket, fileno(fp), NULL, length);
         return SUCCESS;
     }
 
