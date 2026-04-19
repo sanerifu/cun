@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/sendfile.h>
 #include <sys/socket.h>
 #include <threads.h>
 #include <unistd.h>
@@ -19,6 +20,12 @@
 #include "result.c"
 
 extern void luaL_openlibs(lua_State* L);  // my headers don't have this for some reason
+
+extern int fileno(FILE*);
+
+static void shutdownWrapper(void* data) {
+    shutdown(*(int*)data, SHUT_RDWR);
+}
 
 static void lua_closeWrapper(void* data) {
     lua_close(*(lua_State**)data);
@@ -65,7 +72,7 @@ static int requestHandler(void* input_ptr) {
 
     Arena allocator = {0};
     Result result = SUCCESS;
-    int socket = input.socket;
+    int CLEAN(shutdown) socket = input.socket;
     String ip = ZSTRING(input.ip);
 
     String header = {0};
@@ -123,6 +130,34 @@ static int requestHandler(void* input_ptr) {
         }
     }
 
+    FILE* CLEAN(fclose) fp = NULL;
+    String path = {0};
+    BUBBLE(stringFormat(&path, &allocator, ".%.*s", FORMAT(parsed_header.path)), "Could not format path");
+    fprintf(stderr, "serving %.*s\n", FORMAT(path));
+    if ((fp = fopen(path.data, "rb"))) {
+        fseek(fp, 0, SEEK_END);
+        size_t length = ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+
+        String formatted = {0};
+        BUBBLE(
+            stringFormat(
+                &formatted,
+                &allocator,
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Length: %zu\r\n"
+                "\r\n",
+
+                length
+            ),
+            "Could not format response header"
+        );
+        send(socket, formatted.data, formatted.length, 0);
+
+        sendfile(socket, fileno(fp), NULL, length);
+        return SUCCESS;
+    }
+
     String formatted;
 
     String lua_content_path;
@@ -131,7 +166,6 @@ static int requestHandler(void* input_ptr) {
         "Could not create path"
     );
 
-    FILE* CLEAN(fclose) fp = NULL;
     String lua_data = LSTRING(NULL, 0);
 
     if ((fp = fopen(lua_content_path.data, "rb"))) {
@@ -364,8 +398,6 @@ static int requestHandler(void* input_ptr) {
         send(socket, formatted.data, formatted.length, 0);
     }
 
-    shutdown(socket, SHUT_RDWR);
-
     return SUCCESS;
 }
 
@@ -385,7 +417,7 @@ static int serverLoop(void* sock) {
             }
             THROW(ACCEPT_ERROR, "%s\n", strerror(errno));
         }
-        
+
         thrd_t thread;
         RequestHandlerInput* input = malloc(sizeof(*input));
         input->socket = client_socket;
